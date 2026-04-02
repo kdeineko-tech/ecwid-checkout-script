@@ -14,7 +14,7 @@
     'tip': 'Please choose your city based on your selected state.',
   };
 
-  // Додати кастомне поле до конфігурації
+  // Функція для оновлення варіантів міст залежно від вибраного штату
   function updateCityField(stateValue) {
     const CITY_MAP = {
       California: ["Los Angeles", "San Diego", "San Jose", "Sacramento"],
