@@ -4,6 +4,7 @@
     TX: { label: "Texas", cities: ["Houston", "Dallas", "Austin", "San Antonio"] },
     FL: { label: "Florida", cities: ["Miami", "Orlando", "Tampa", "Jacksonville"] },
     NY: { label: "New York", cities: ["New York", "Buffalo", "Albany", "Rochester"] }
+    // Додайте інші штати та міста за необхідністю
   };
 
   const CONFIG = {
@@ -130,12 +131,33 @@
       if (cities.length === 0) {
         setInfo(CONFIG.labels.emptyCities);
       }
+
+      // Передача значень в поля Ecwid для shipping address
+      setEcwidCheckoutFields(stateCode, citySelect.value);
     });
 
     citySelect.addEventListener("change", function () {
-      const stateCode = stateSelect.value;
       const city = this.value;
       console.log("City selected:", city);
+
+      // Передача значень у Ecwid при виборі міста
+      setEcwidCheckoutFields(stateSelect.value, city);
+    });
+  }
+
+  function setEcwidCheckoutFields(state, city) {
+    // Встановлюємо значення в кастомні поля Ecwid
+    Ecwid.Cart.get(function(cart) {
+      const shippingAddress = cart.shippingPerson || {};
+
+      // Оновлюємо кастомні поля для State і City
+      shippingAddress["customFields"] = shippingAddress["customFields"] || {};
+      shippingAddress.customFields["state"] = state;
+      shippingAddress.customFields["city"] = city;
+
+      Ecwid.Cart.setAddress(shippingAddress, function() {
+        console.log("Shipping address updated with state and city");
+      });
     });
   }
 
