@@ -3,7 +3,7 @@
   ec.order = ec.order || {};
   ec.order.extraFields = ec.order.extraFields || {};
 
-  // Мапа всіх міст по штатах
+  // Мапа міст по штатах
   const CITY_MAP = {
     California: ["Los Angeles", "San Diego", "San Jose", "Sacramento"],
     Texas: ["Houston", "Dallas", "Austin", "San Antonio"],
@@ -11,15 +11,30 @@
     "New York": ["New York", "Buffalo", "Albany", "Rochester"]
   };
 
-  // Створення екстра поля для міста
+  // Створюємо екстра поле для міста з усіма можливими варіантами
   ec.order.extraFields.city_filter = {
     title: "Choose City",
     type: "select",
     required: true,
     checkoutDisplaySection: "shipping_address",
     options: [
-      { title: "Please choose" }, // Початкова опція для "Please choose"
-      // Міста будуть додаватися з CITY_MAP після вибору штату
+      { title: "Please choose" },
+      { title: "Los Angeles" },
+      { title: "San Diego" },
+      { title: "San Jose" },
+      { title: "Sacramento" },
+      { title: "Houston" },
+      { title: "Dallas" },
+      { title: "Austin" },
+      { title: "San Antonio" },
+      { title: "Miami" },
+      { title: "Orlando" },
+      { title: "Tampa" },
+      { title: "Jacksonville" },
+      { title: "New York" },
+      { title: "Buffalo" },
+      { title: "Albany" },
+      { title: "Rochester" }
     ]
   };
 
@@ -29,8 +44,8 @@
 
     // Оновлюємо опції для списку міст
     ec.order.extraFields.city_filter.options = [
-      { title: "Please choose" }, // Тільки одна опція для "Please choose"
-      ...cities.map(city => ({ title: city })) // Додаємо лише міста, які відповідають штату
+      { title: "Please choose" },
+      ...cities.map(city => ({ title: city })) // Додаємо тільки міста, що відповідають штату
     ];
 
     // Оновлюємо конфігурацію Ecwid
@@ -55,7 +70,7 @@
     // Після завантаження сторінки — оновлюємо список міст, якщо вже є вибір штату
     const stateSelect = document.querySelector("select[name='state']");
     if (stateSelect && stateSelect.value) {
-      updateCityField(stateSelect.value); // Оновлюємо місто на основі вибраного штату
+      updateCityField(stateSelect.value); // Оновлюємо список міст на основі вибраного штату
     }
 
     // Явно робимо кастомне поле міста видимим
