@@ -1,21 +1,9 @@
 (function () {
   const LOCATIONS = {
-    CA: {
-      label: "California",
-      cities: ["Los Angeles", "San Diego", "San Jose", "Sacramento"]
-    },
-    TX: {
-      label: "Texas",
-      cities: ["Houston", "Dallas", "Austin", "San Antonio"]
-    },
-    FL: {
-      label: "Florida",
-      cities: ["Miami", "Orlando", "Tampa", "Jacksonville"]
-    },
-    NY: {
-      label: "New York",
-      cities: ["New York", "Buffalo", "Albany", "Rochester"]
-    }
+    CA: { label: "California", cities: ["Los Angeles", "San Diego", "San Jose", "Sacramento"] },
+    TX: { label: "Texas", cities: ["Houston", "Dallas", "Austin", "San Antonio"] },
+    FL: { label: "Florida", cities: ["Miami", "Orlando", "Tampa", "Jacksonville"] },
+    NY: { label: "New York", cities: ["New York", "Buffalo", "Albany", "Rochester"] }
   };
 
   const CONFIG = {
@@ -50,7 +38,16 @@
   }
 
   function tryMount() {
-    if (document.getElementById(CONFIG.containerId)) {
+    if (!isCheckoutPage()) {
+      const existing = document.getElementById(CONFIG.containerId);
+      if (existing) {
+        existing.remove();
+      }
+      return;
+    }
+
+    const existing = document.getElementById(CONFIG.containerId);
+    if (existing) {
       return;
     }
 
@@ -63,12 +60,11 @@
   }
 
   function findCheckoutTarget() {
-    return (
-      document.querySelector(".ec-cart") ||
-      document.querySelector(".ec-checkout") ||
-      document.querySelector("[class*='Ecwid']") ||
-      document.querySelector("body")
-    );
+    return document.querySelector(".ec-cart") || document.querySelector(".ec-checkout");
+  }
+
+  function isCheckoutPage() {
+    return window.location.href.includes("#!/~/cart") || !!document.querySelector(".ec-cart") || !!document.querySelector(".ec-checkout");
   }
 
   function renderLocationUI(target) {
@@ -117,6 +113,7 @@
 
     stateSelect.addEventListener("change", function () {
       const stateCode = this.value;
+      console.log("State selected:", stateCode);
 
       resetCitySelect(citySelect);
       setInfo("");
@@ -126,8 +123,7 @@
         return;
       }
 
-      const cities = getCitiesForState(stateCode);
-
+      const cities = LOCATIONS[stateCode] ? LOCATIONS[stateCode].cities : [];
       fillCitySelect(citySelect, cities);
       citySelect.disabled = cities.length === 0;
 
@@ -139,15 +135,7 @@
     citySelect.addEventListener("change", function () {
       const stateCode = stateSelect.value;
       const city = this.value;
-
-      console.log("Selected location:", {
-        state: stateCode,
-        city: city
-      });
-
-      // Тут далі можна буде додати:
-      // sync в shipping address
-      // або запис у Ecwid extra field
+      console.log("City selected:", city);
     });
   }
 
@@ -160,14 +148,8 @@
     });
   }
 
-  function getCitiesForState(stateCode) {
-    const state = LOCATIONS[stateCode];
-    return state ? state.cities : [];
-  }
-
   function resetCitySelect(select) {
     select.innerHTML = "";
-
     const option = document.createElement("option");
     option.value = "";
     option.textContent = CONFIG.labels.selectCity;
@@ -201,14 +183,10 @@
       .replaceAll("'", "&#039;");
   }
 
-  function waitForEcwid() {
-    if (window.Ecwid && Ecwid.OnAPILoaded && Ecwid.OnAPILoaded.add) {
-      Ecwid.OnAPILoaded.add(initEcwidScript);
-      return;
+  document.addEventListener("DOMContentLoaded", function () {
+    const target = document.querySelector(".ec-cart"); // Це селектор для сторінки checkout
+    if (target) {
+      renderLocationUI(target);
     }
-
-    setTimeout(waitForEcwid, 300);
-  }
-
-  waitForEcwid();
+  });
 })();
