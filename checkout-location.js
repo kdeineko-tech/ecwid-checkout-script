@@ -1,4 +1,4 @@
-Second Script (filter cities only visually and after the reloading page)  (function () {
+(function () {
   const STATE_FIELD_LABEL = "Choose State";
   const CITY_FIELD_LABEL = "Choose City";
 
