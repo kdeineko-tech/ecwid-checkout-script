@@ -9,6 +9,9 @@
     "New York": ["New York", "Buffalo", "Albany", "Rochester"]
   };
 
+  const CUSTOM_CITY_WRAPPER_ID = "custom-city-filter-wrapper";
+  const CUSTOM_CITY_SELECT_ID = "custom-city-filter-select";
+
   function normalize(value) {
     return (value || "").replace(/\s+/g, " ").trim().toLowerCase();
   }
@@ -17,28 +20,19 @@
     return !!document.querySelector(".ec-cart") || !!document.querySelector(".ec-checkout");
   }
 
-  function findSelectByLabelText(labelText) {
+  function findFieldContainerByLabelText(labelText) {
     const wanted = normalize(labelText);
-    const nodes = Array.from(document.querySelectorAll("label, div, span"));
+    const candidates = Array.from(document.querySelectorAll("label, div, span"));
 
-    for (const node of nodes) {
+    for (const node of candidates) {
       if (normalize(node.textContent) !== wanted) continue;
 
       let current = node;
-      for (let i = 0; i < 5 && current; i += 1) {
-        const selects = current.querySelectorAll("select");
-        if (selects.length === 1) return selects[0];
-
-        if (selects.length > 1) {
-          for (const select of selects) {
-            const relation = node.compareDocumentPosition(select);
-            if (relation & Node.DOCUMENT_POSITION_FOLLOWING) {
-              return select;
-            }
-          }
-          return selects[0];
+      for (let i = 0; i < 6 && current; i += 1) {
+        const select = current.querySelector("select");
+        if (select) {
+          return current;
         }
-
         current = current.parentElement;
       }
     }
@@ -46,123 +40,133 @@
     return null;
   }
 
-  function saveOriginalCityOptions(citySelect) {
-    if (citySelect.dataset.originalOptionsSaved === "1") return;
-
-    const options = Array.from(citySelect.options).map((option) => ({
-      value: option.value,
-      text: option.textContent,
-      disabled: option.disabled
-    }));
-
-    citySelect.dataset.originalOptions = JSON.stringify(options);
-    citySelect.dataset.originalOptionsSaved = "1";
+  function findSelectByLabelText(labelText) {
+    const container = findFieldContainerByLabelText(labelText);
+    return container ? container.querySelector("select") : null;
   }
 
-  function getOriginalCityOptions(citySelect) {
-    try {
-      return JSON.parse(citySelect.dataset.originalOptions || "[]");
-    } catch (e) {
-      return [];
+  function getStateKey(stateSelect) {
+    if (!stateSelect) return "";
+    const value = stateSelect.value;
+    const text = stateSelect.options[stateSelect.selectedIndex]?.textContent || "";
+    if (CITY_MAP[value]) return value;
+    if (CITY_MAP[text]) return text;
+    return text || value || "";
+  }
+
+  function getCitiesForSelectedState(stateSelect) {
+    const stateKey = getStateKey(stateSelect);
+    return CITY_MAP[stateKey] || [];
+  }
+
+  function hideOriginalCityField(citySelect) {
+    const container = citySelect.closest("div");
+    if (container) {
+      container.style.display = "none";
+    } else {
+      citySelect.style.display = "none";
     }
   }
 
-  function rebuildCityOptions(citySelect, options) {
-    const previousValue = citySelect.value;
-    citySelect.innerHTML = "";
+  function createCustomCitySelect(citySelect) {
+    if (document.getElementById(CUSTOM_CITY_WRAPPER_ID)) {
+      return document.getElementById(CUSTOM_CITY_SELECT_ID);
+    }
 
-    options.forEach((item) => {
+    const wrapper = document.createElement("div");
+    wrapper.id = CUSTOM_CITY_WRAPPER_ID;
+    wrapper.style.marginTop = "16px";
+
+    wrapper.innerHTML = `
+      <label for="${CUSTOM_CITY_SELECT_ID}" style="display:block; font-weight:600; margin-bottom:8px;">
+        Choose City
+      </label>
+      <select id="${CUSTOM_CITY_SELECT_ID}" style="width:100%; padding:12px; border:1px solid #cfd7df; border-radius:4px;">
+        <option value="">Please choose</option>
+      </select>
+    `;
+
+    const cityContainer = findFieldContainerByLabelText(CITY_FIELD_LABEL);
+    if (cityContainer && cityContainer.parentElement) {
+      cityContainer.parentElement.insertBefore(wrapper, cityContainer.nextSibling);
+    } else {
+      citySelect.parentElement?.appendChild(wrapper);
+    }
+
+    return document.getElementById(CUSTOM_CITY_SELECT_ID);
+  }
+
+  function fillCustomCitySelect(customCitySelect, cities, selectedValue) {
+    const currentSelected = selectedValue || "";
+
+    customCitySelect.innerHTML = "";
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Please choose";
+    customCitySelect.appendChild(placeholder);
+
+    cities.forEach((city) => {
       const option = document.createElement("option");
-      option.value = item.value;
-      option.textContent = item.text;
-      option.disabled = !!item.disabled;
-      citySelect.appendChild(option);
+      option.value = city;
+      option.textContent = city;
+      customCitySelect.appendChild(option);
     });
 
-    const canRestore = options.some((item) => item.value === previousValue);
-    if (canRestore) {
-      citySelect.value = previousValue;
+    if (cities.includes(currentSelected)) {
+      customCitySelect.value = currentSelected;
     } else {
-      citySelect.selectedIndex = 0;
+      customCitySelect.value = "";
+    }
+  }
+
+  function setOriginalCityValue(citySelect, value) {
+    citySelect.value = value;
+
+    const matchingOption = Array.from(citySelect.options).find(
+      (option) => normalize(option.value) === normalize(value) || normalize(option.textContent) === normalize(value)
+    );
+
+    if (matchingOption) {
+      citySelect.value = matchingOption.value;
     }
 
+    citySelect.dispatchEvent(new Event("input", { bubbles: true }));
     citySelect.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
-  function filterCityOptions(stateSelect, citySelect) {
-    const selectedStateValue = stateSelect.value;
-    const selectedStateText =
-      stateSelect.options[stateSelect.selectedIndex]?.textContent || "";
-
-    const stateKey = CITY_MAP[selectedStateValue]
-      ? selectedStateValue
-      : selectedStateText;
-
-    const originalOptions = getOriginalCityOptions(citySelect);
-
-    if (!originalOptions.length) return;
-
-    console.log(`Filtering cities for state: ${stateKey}`);  // Лог для дебагу
-
-    // Очищаємо вибір міста, коли вибирається новий штат
-    citySelect.value = "";
-
-    if (!stateKey || !CITY_MAP[stateKey]) {
-      rebuildCityOptions(citySelect, originalOptions);
-      return;
-    }
-
-    const allowedCities = CITY_MAP[stateKey].map(normalize);
-
-    const placeholderOptions = originalOptions.filter((item) => {
-      const text = normalize(item.text);
-      return (
-        !item.value ||
-        text.includes("please choose") ||
-        text.includes("select") ||
-        text.includes("choose")
-      );
-    });
-
-    const filteredCityOptions = originalOptions.filter((item) => {
-      return (
-        allowedCities.includes(normalize(item.value)) ||
-        allowedCities.includes(normalize(item.text))
-      );
-    });
-
-    rebuildCityOptions(citySelect, [...placeholderOptions, ...filteredCityOptions]);
-  }
-
-  function initCityFilter() {
+  function init() {
     if (!isCheckoutPage()) return;
 
     const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
     const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
 
-    if (!stateSelect || !citySelect) {
-      console.log("State or City field not found!");  // Лог для дебагу
-      return;
+    if (!stateSelect || !citySelect) return;
+    if (stateSelect.dataset.cityProxyInitialized === "1") return;
+
+    stateSelect.dataset.cityProxyInitialized = "1";
+
+    hideOriginalCityField(citySelect);
+    const customCitySelect = createCustomCitySelect(citySelect);
+
+    function refreshCustomCityOptions() {
+      const cities = getCitiesForSelectedState(stateSelect);
+      fillCustomCitySelect(customCitySelect, cities, "");
+      setOriginalCityValue(citySelect, "");
     }
 
-    console.log("State and City fields found.");  // Лог для дебагу
-
-    if (citySelect.dataset.cityFilterInitialized === "1") return;
-    citySelect.dataset.cityFilterInitialized = "1";
-
-    saveOriginalCityOptions(citySelect);
-
     stateSelect.addEventListener("change", function () {
-      filterCityOptions(stateSelect, citySelect);
+      refreshCustomCityOptions();
     });
 
-    filterCityOptions(stateSelect, citySelect);
+    customCitySelect.addEventListener("change", function () {
+      setOriginalCityValue(citySelect, this.value);
+    });
 
-    console.log("City filter initialized");  // Лог для дебагу
+    refreshCustomCityOptions();
   }
 
   const observer = new MutationObserver(function () {
-    initCityFilter();
+    init();
   });
 
   function start() {
@@ -170,8 +174,7 @@
       childList: true,
       subtree: true
     });
-
-    initCityFilter();
+    init();
   }
 
   if (document.readyState === "loading") {
