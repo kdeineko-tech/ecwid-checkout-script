@@ -99,6 +99,8 @@
         const selectedStateText =
             stateSelect.options[stateSelect.selectedIndex]?.textContent || "";
 
+        console.log(`Filtering cities for state: ${selectedStateText}`);  // Лог для дебагу
+
         // Додатково перевірка тексту
         const stateKey = CITY_MAP[selectedStateValue]
             ? selectedStateValue
@@ -107,8 +109,6 @@
         const originalOptions = getOriginalCityOptions(citySelect);
 
         if (!originalOptions.length) return;
-
-        console.log(`Filtering cities for state: ${stateKey}`);  // Лог для дебагу
 
         // Очищаємо вибір міста, коли вибирається новий штат
         citySelect.value = "";
