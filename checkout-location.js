@@ -8,7 +8,7 @@
   ec.order.extraFields.city_filter = {
     'title': 'Choose City',
     'type': 'select',
-    'options': [],
+    'options': ["Los Angeles", "San Diego", "San Jose", "Sacramento", "Houston", "Dallas", "Austin", "San Antonio"],
     'required': true,
     'checkoutDisplaySection': 'shipping_address',
     'tip': 'Please choose your city based on your selected state.',
