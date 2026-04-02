@@ -9,7 +9,7 @@ const CITY_MAP = {
 };
 
 Ecwid.OnAPILoaded.add(function () {
-  window.ec = window.ec || {};
+  const ec = window.ec || {};
   ec.order = ec.order || {};
   ec.order.extraFields = ec.order.extraFields || {};
 
@@ -31,20 +31,34 @@ Ecwid.OnAPILoaded.add(function () {
     options: [] // спочатку порожній select
   };
 
-  // Функція оновлення міст при зміні штату
-  function updateCities(state) {
-    const cities = CITY_MAP[state] || [];
-    ec.order.extraFields.custom_city.options = cities.map(city => ({ title: city }));
-    ec.order.extraFields.custom_city.value = null; // скидаємо вибране місто
-    Ecwid.refreshConfig();
-  }
+  Ecwid.refreshConfig();
 
-  // Слухаємо зміну поля custom_state
-  Ecwid.OnFieldChanged.add(function (fieldId, value) {
-    if (fieldId === "custom_state") {
-      updateCities(value);
+  // Чекаємо завантаження checkout сторінки
+  Ecwid.OnPageLoaded.add(function(page) {
+    if (page.type === "CHECKOUT") {
+      // Отримуємо DOM для поля штату
+      const stateSelect = document.querySelector('select[name="custom_state"]');
+
+      if (!stateSelect) return;
+
+      stateSelect.addEventListener('change', function() {
+        const state = stateSelect.value;
+        const citySelect = document.querySelector('select[name="custom_city"]');
+        if (!citySelect) return;
+
+        // Оновлюємо міста
+        const cities = CITY_MAP[state] || [];
+        citySelect.innerHTML = '<option value="">Choose City</option>';
+        cities.forEach(city => {
+          const opt = document.createElement('option');
+          opt.value = city;
+          opt.textContent = city;
+          citySelect.appendChild(opt);
+        });
+
+        // Скидаємо значення
+        citySelect.value = "";
+      });
     }
   });
-
-  Ecwid.refreshConfig();
 });
