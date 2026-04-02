@@ -129,6 +129,8 @@
   }
 
   function fillCustomCitySelect(customCitySelect, cities, selectedValue) {
+    console.log("Filling custom city select:", cities, selectedValue);
+
     const currentSelected = selectedValue || "";
 
     customCitySelect.innerHTML = "";
@@ -153,6 +155,8 @@
   }
 
   function setOriginalCityValue(citySelect, value) {
+    console.log("Setting original city value:", value);
+
     const normalizedValue = normalize(value);
 
     const matchingOption = Array.from(citySelect.options).find((option) => {
@@ -176,6 +180,8 @@
   }
 
   function syncUI(stateSelect, citySelect, customCitySelect) {
+    console.log("Syncing UI with selected state:", stateSelect.value);
+
     const cities = getCitiesForSelectedState(stateSelect);
     const currentOriginalValue = getOriginalCityCurrentValue(citySelect);
 
@@ -188,10 +194,13 @@
   }
 
   function mountCityProxy() {
+    console.log("Attempting to mount city proxy...");
+
     const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
     const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
 
     if (!stateSelect || !citySelect) {
+      console.log("State or city select not found.");
       return false;
     }
 
@@ -202,6 +211,7 @@
       stateSelect.dataset.cityProxyBound = "1";
 
       stateSelect.addEventListener("change", function () {
+        console.log("State changed, refreshing city options.");
         const freshCustomCitySelect = document.getElementById(CUSTOM_CITY_SELECT_ID);
         const freshCitySelect = findSelectByLabelText(CITY_FIELD_LABEL);
 
@@ -216,6 +226,7 @@
       customCitySelect.dataset.cityProxyBound = "1";
 
       customCitySelect.addEventListener("change", function () {
+        console.log("Custom city selected:", this.value);
         const freshCitySelect = findSelectByLabelText(CITY_FIELD_LABEL);
         if (!freshCitySelect) return;
 
@@ -243,6 +254,7 @@
     }
 
     checkoutObserver = new MutationObserver(function () {
+      console.log("Mutation observed, retrying mount.");
       mountCityProxy();
     });
 
