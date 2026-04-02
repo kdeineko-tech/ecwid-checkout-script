@@ -84,7 +84,7 @@
       <label for="${CUSTOM_CITY_SELECT_ID}" style="font-weight:600; margin-bottom:8px;">
         Choose City
       </label>
-      <select id="${CUSTOM_CITY_SELECT_ID}" style="width:100%; padding:12px; border:1px solid #cfd7df; border-radius:4px;">
+      <select id="${CUSTOM_CITY_SELECT_ID}" class="form-control__select" style="width:100%; padding:12px; border:1px solid #cfd7df; border-radius:4px;">
         <option value="">Please choose</option>
       </select>
     `;
