@@ -1,64 +1,164 @@
-const STATE_FIELD_LABEL = "Choose State";
-const CITY_FIELD_LABEL = "Choose City";
+(function () {
+  const STATE_FIELD_LABEL = "Choose State";
+  const CITY_FIELD_LABEL = "Choose City";
 
-const CITY_MAP = {
-  "California": ["Los Angeles", "San Diego", "San Jose", "Sacramento"],
-  "Texas": ["Houston", "Dallas", "Austin", "San Antonio"],
-  "Florida": ["Miami", "Orlando", "Tampa", "Jacksonville"],
-  "New York": ["New York", "Buffalo", "Albany", "Rochester"]
-};
-
-Ecwid.OnAPILoaded.add(function () {
-  const ec = window.ec || {};
-  ec.order = ec.order || {};
-  ec.order.extraFields = ec.order.extraFields || {};
-
-  // Штат
-  ec.order.extraFields.custom_state = {
-    title: STATE_FIELD_LABEL,
-    type: "select",
-    required: true,
-    checkoutDisplaySection: "shipping_address",
-    options: Object.keys(CITY_MAP).map(state => ({ title: state }))
+  const CITY_MAP = {
+    "California": ["Los Angeles", "San Diego", "San Jose", "Sacramento"],
+    "Texas": ["Houston", "Dallas", "Austin", "San Antonio"],
+    "Florida": ["Miami", "Orlando", "Tampa", "Jacksonville"],
+    "New York": ["New York", "Buffalo", "Albany", "Rochester"]
   };
 
-  // Місто
-  ec.order.extraFields.custom_city = {
-    title: CITY_FIELD_LABEL,
-    type: "select",
-    required: true,
-    checkoutDisplaySection: "shipping_address",
-    options: [] // спочатку порожній select
-  };
+  function normalize(value) {
+    return (value || "").replace(/\s+/g, " ").trim().toLowerCase();
+  }
 
-  Ecwid.refreshConfig();
+  function isCheckoutPage() {
+    return !!document.querySelector(".ec-cart") || !!document.querySelector(".ec-checkout");
+  }
 
-  // Чекаємо завантаження checkout сторінки
-  Ecwid.OnPageLoaded.add(function(page) {
-    if (page.type === "CHECKOUT") {
-      // Отримуємо DOM для поля штату
-      const stateSelect = document.querySelector('select[name="custom_state"]');
+  function findSelectByLabelText(labelText) {
+    const wanted = normalize(labelText);
+    const nodes = Array.from(document.querySelectorAll("label, div, span"));
 
-      if (!stateSelect) return;
+    for (const node of nodes) {
+      if (normalize(node.textContent) !== wanted) continue;
 
-      stateSelect.addEventListener('change', function() {
-        const state = stateSelect.value;
-        const citySelect = document.querySelector('select[name="custom_city"]');
-        if (!citySelect) return;
+      let current = node;
+      for (let i = 0; i < 5 && current; i += 1) {
+        const selects = current.querySelectorAll("select");
+        if (selects.length === 1) return selects[0];
 
-        // Оновлюємо міста
-        const cities = CITY_MAP[state] || [];
-        citySelect.innerHTML = '<option value="">Choose City</option>';
-        cities.forEach(city => {
-          const opt = document.createElement('option');
-          opt.value = city;
-          opt.textContent = city;
-          citySelect.appendChild(opt);
-        });
+        if (selects.length > 1) {
+          for (const select of selects) {
+            const relation = node.compareDocumentPosition(select);
+            if (relation & Node.DOCUMENT_POSITION_FOLLOWING) {
+              return select;
+            }
+          }
+          return selects[0];
+        }
 
-        // Скидаємо значення
-        citySelect.value = "";
-      });
+        current = current.parentElement;
+      }
     }
-  });
-});
+
+    return null;
+  }
+
+  function saveOriginalCityOptions(citySelect) {
+    if (citySelect.dataset.originalOptionsSaved === "1") return;
+
+    const options = Array.from(citySelect.options).map(option => ({
+      value: option.value,
+      text: option.textContent,
+      disabled: option.disabled
+    }));
+
+    citySelect.dataset.originalOptions = JSON.stringify(options);
+    citySelect.dataset.originalOptionsSaved = "1";
+  }
+
+  function getOriginalCityOptions(citySelect) {
+    try {
+      return JSON.parse(citySelect.dataset.originalOptions || "[]");
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function rebuildCityOptions(citySelect, options) {
+    const previousValue = citySelect.value;
+    citySelect.innerHTML = "";
+
+    options.forEach(item => {
+      const option = document.createElement("option");
+      option.value = item.value;
+      option.textContent = item.text;
+      option.disabled = !!item.disabled;
+      citySelect.appendChild(option);
+    });
+
+    const canRestore = options.some(item => item.value === previousValue);
+    if (canRestore) {
+      citySelect.value = previousValue;
+    } else {
+      citySelect.selectedIndex = 0;
+    }
+
+    citySelect.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  function filterCityOptions(stateSelect, citySelect) {
+    const selectedStateValue = stateSelect.value;
+    const selectedStateText = stateSelect.options[stateSelect.selectedIndex]?.textContent || "";
+
+    // Правильне визначення ключа в CITY_MAP
+    const stateKey =
+      CITY_MAP[selectedStateValue]
+        ? selectedStateValue
+        : Object.keys(CITY_MAP).find(key => normalize(key) === normalize(selectedStateText));
+
+    const originalOptions = getOriginalCityOptions(citySelect);
+    if (!originalOptions.length) return;
+
+    console.log(`Filtering cities for state: ${stateKey}`);
+
+    citySelect.value = "";
+
+    if (!stateKey || !CITY_MAP[stateKey]) {
+      rebuildCityOptions(citySelect, originalOptions);
+      return;
+    }
+
+    const allowedCities = CITY_MAP[stateKey].map(normalize);
+
+    const placeholderOptions = originalOptions.filter(item => {
+      const text = normalize(item.text);
+      return !item.value || text.includes("please choose") || text.includes("select") || text.includes("choose");
+    });
+
+    const filteredCityOptions = originalOptions.filter(item =>
+      allowedCities.includes(normalize(item.value)) || allowedCities.includes(normalize(item.text))
+    );
+
+    rebuildCityOptions(citySelect, [...placeholderOptions, ...filteredCityOptions]);
+  }
+
+  function initCityFilter(stateSelect, citySelect) {
+    if (citySelect.dataset.cityFilterInitialized === "1") return;
+    citySelect.dataset.cityFilterInitialized = "1";
+
+    saveOriginalCityOptions(citySelect);
+
+    stateSelect.addEventListener("change", () => filterCityOptions(stateSelect, citySelect));
+    filterCityOptions(stateSelect, citySelect);
+
+    console.log("City filter initialized");
+  }
+
+  function safeInit() {
+    if (!isCheckoutPage()) return false;
+
+    const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
+    const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
+
+    if (!stateSelect || !citySelect) return false;
+
+    initCityFilter(stateSelect, citySelect);
+    return true;
+  }
+
+  function start() {
+    if (!safeInit()) {
+      const observer = new MutationObserver(() => safeInit());
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", start);
+  } else {
+    start();
+  }
+})();
