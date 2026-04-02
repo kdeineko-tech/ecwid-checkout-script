@@ -49,9 +49,10 @@
   function saveOriginalCityOptions(citySelect) {
     if (citySelect.dataset.originalOptionsSaved === "1") return;
 
+    // ✅ Зберігаємо text як еталон, value використовуємо як fallback
     const options = Array.from(citySelect.options).map((option) => ({
       value: option.value,
-      text: option.textContent,
+      text: option.textContent.trim(),
       disabled: option.disabled
     }));
 
@@ -72,13 +73,13 @@
 
     options.forEach(item => {
       const option = document.createElement("option");
-      option.value = item.value;
+      // ✅ Головний фікс: value = text щоб вони завжди збігались
+      option.value = item.text || item.value;
       option.textContent = item.text;
       option.disabled = !!item.disabled;
       citySelect.appendChild(option);
     });
 
-    // Встановлюємо першу валідну опцію (не placeholder)
     const firstValid = Array.from(citySelect.options).find(opt => opt.value && !opt.disabled);
     citySelect.value = firstValid ? firstValid.value : "";
 
@@ -117,7 +118,7 @@
       );
     });
 
-    // ✅ Фікс: фільтруємо тільки по тексту, ігноруємо value
+    // ✅ Фільтруємо виключно по text
     const filteredCityOptions = originalOptions.filter((item) => {
       return allowedCities.includes(normalize(item.text));
     });
