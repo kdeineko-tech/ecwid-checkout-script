@@ -1,7 +1,7 @@
 (function () {
   const CONFIG = {
     locationsUrl:
-      "https://cdn.jsdelivr.net/gh/kdeineko-tech/ecwid-checkout-script/locations.json",
+      "https://raw.githubusercontent.com/kdeineko-tech/ecwid-checkout-script/main/locations.json",
     pickupLabel: "Pick-Up Location",
     pickupPlaceholder: "Choose pick-up location",
     stateLabelHints: ["state", "province", "region"],
