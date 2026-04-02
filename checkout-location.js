@@ -68,7 +68,6 @@
   }
 
   function rebuildCityOptions(citySelect, options) {
-    const previousValue = citySelect.value;
     citySelect.innerHTML = "";
 
     options.forEach(item => {
@@ -79,14 +78,9 @@
       citySelect.appendChild(option);
     });
 
-    // Відновлюємо попереднє значення, якщо воно існує
-    if (previousValue && Array.from(citySelect.options).some(opt => opt.value === previousValue)) {
-      citySelect.value = previousValue;
-    } else {
-      // Встановлюємо першу валідну опцію (не placeholder)
-      const firstValid = Array.from(citySelect.options).find(opt => opt.value && !opt.disabled);
-      citySelect.value = firstValid ? firstValid.value : "";
-    }
+    // Встановлюємо першу валідну опцію (не placeholder)
+    const firstValid = Array.from(citySelect.options).find(opt => opt.value && !opt.disabled);
+    citySelect.value = firstValid ? firstValid.value : "";
 
     citySelect.dispatchEvent(new Event("change", { bubbles: true }));
   }
@@ -106,9 +100,6 @@
 
     console.log(`Filtering cities for state: ${stateKey}`);
 
-    // Очищаємо вибір міста перед фільтруванням
-    citySelect.value = "";
-
     if (!stateKey || !CITY_MAP[stateKey]) {
       rebuildCityOptions(citySelect, originalOptions);
       return;
@@ -126,11 +117,9 @@
       );
     });
 
+    // ✅ Фікс: фільтруємо тільки по тексту, ігноруємо value
     const filteredCityOptions = originalOptions.filter((item) => {
-      return (
-        allowedCities.includes(normalize(item.value)) ||
-        allowedCities.includes(normalize(item.text))
-      );
+      return allowedCities.includes(normalize(item.text));
     });
 
     rebuildCityOptions(citySelect, [...placeholderOptions, ...filteredCityOptions]);
