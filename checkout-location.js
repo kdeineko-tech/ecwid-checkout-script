@@ -1,130 +1,38 @@
-(function () {
-    const STATE_FIELD_NAME = "province";  // Використовуємо name або id
-    const CITY_FIELD_NAME = "city";      // Використовуємо name або id
+const CITY_MAP = {
+  "California": ["Los Angeles", "San Diego", "San Jose", "Sacramento"],
+  "Texas": ["Houston", "Dallas", "Austin", "San Antonio"],
+  "Florida": ["Miami", "Orlando", "Tampa", "Jacksonville"],
+  "New York": ["New York", "Buffalo", "Albany", "Rochester"]
+};
 
-    const CITY_MAP = {
-        "California": ["Los Angeles", "San Diego", "San Jose", "Sacramento"],
-        "Texas": ["Houston", "Dallas", "Austin", "San Antonio"],
-        "Florida": ["Miami", "Orlando", "Tampa", "Jacksonville"],
-        "New York": ["New York", "Buffalo", "Albany", "Rochester"]
-    };
+Ecwid.OnAPILoaded.add(function () {
+  Ecwid.OnPageLoaded.add(function (page) {
+    if (page.type == "CART") {
+      window.ec = window.ec || {};
+      ec.order = ec.order || {};
+      ec.order.extraFields = ec.order.extraFields || {};
 
-    function normalize(value) {
-        return (value || "").replace(/\s+/g, " ").trim().toLowerCase();
+      ec.order.extraFields.choose_state = {
+        title: "Choose State",
+        type: "select",
+        options: Object.keys(CITY_MAP).map(function (state) {
+          return { title: state };
+        }),
+        required: true,
+        checkoutDisplaySection: "shipping_address"
+      };
+
+      ec.order.extraFields.choose_city = {
+        title: "Choose City",
+        type: "select",
+        options: CITY_MAP["California"].map(function (city) {
+          return { title: city };
+        }),
+        required: true,
+        checkoutDisplaySection: "shipping_address"
+      };
+
+      window.Ecwid && Ecwid.refreshConfig();
     }
-
-    function findSelectByNameOrId(nameOrId) {
-        console.log(`Finding select for ${nameOrId}`);
-        return document.querySelector(`select[name="${nameOrId}"], select[id="${nameOrId}"]`);
-    }
-
-    function saveOriginalCityOptions(citySelect) {
-        console.log('Saving original city options');
-        if (citySelect.dataset.originalOptionsSaved === "1") return;
-
-        const options = Array.from(citySelect.options).map((option) => ({
-            value: option.value,
-            text: option.textContent,
-            disabled: option.disabled
-        }));
-
-        citySelect.dataset.originalOptions = JSON.stringify(options);
-        citySelect.dataset.originalOptionsSaved = "1";
-    }
-
-    function getOriginalCityOptions(citySelect) {
-        console.log('Getting original city options');
-        try {
-            return JSON.parse(citySelect.dataset.originalOptions || "[]");
-        } catch (e) {
-            return [];
-        }
-    }
-
-    function rebuildCityOptions(citySelect, options) {
-        console.log('Rebuilding city options');
-        const previousValue = citySelect.value;
-        citySelect.innerHTML = "";
-
-        options.forEach((item) => {
-            const option = document.createElement("option");
-            option.value = item.value;
-            option.textContent = item.text;
-            option.disabled = !!item.disabled;
-            citySelect.appendChild(option);
-        });
-
-        citySelect.value = previousValue || "";
-    }
-
-    function filterCityOptions(stateSelect, citySelect) {
-        if (!stateSelect || !citySelect) {
-            console.error('State or City select element not found!');
-            return;
-        }
-
-        const selectedStateValue = stateSelect.value;
-
-        // Лог для дебагу
-        console.log(`Filtering cities for state: ${selectedStateValue}`);
-
-        const stateKey = CITY_MAP[selectedStateValue] ? selectedStateValue : "";
-
-        const originalOptions = getOriginalCityOptions(citySelect);
-
-        if (!originalOptions.length) return;
-
-        citySelect.value = "";
-
-        if (!stateKey || !CITY_MAP[stateKey]) {
-            rebuildCityOptions(citySelect, originalOptions);
-            return;
-        }
-
-        const allowedCities = CITY_MAP[stateKey].map(normalize);
-
-        const placeholderOptions = originalOptions.filter((item) => {
-            const text = normalize(item.text);
-            return !item.value || text.includes("please choose") || text.includes("select");
-        });
-
-        const filteredCityOptions = originalOptions.filter((item) => {
-            const normalizedValue = normalize(item.value);
-            const normalizedText = normalize(item.text);
-            return allowedCities.includes(normalizedValue) || allowedCities.includes(normalizedText);
-        });
-
-        rebuildCityOptions(citySelect, [...placeholderOptions, ...filteredCityOptions]);
-    }
-
-    function initCityFilter() {
-        console.log("Initializing city filter...");
-
-        const stateSelect = findSelectByNameOrId(STATE_FIELD_NAME);
-        const citySelect = findSelectByNameOrId(CITY_FIELD_NAME);
-
-        if (!stateSelect || !citySelect) {
-            console.error('State or City select element not found!');
-            return;
-        }
-
-        console.log("State and City fields found.");  // Лог для дебагу
-
-        if (citySelect.dataset.cityFilterInitialized === "1") return;
-        citySelect.dataset.cityFilterInitialized = "1";
-
-        saveOriginalCityOptions(citySelect);
-
-        stateSelect.addEventListener("change", function () {
-            filterCityOptions(stateSelect, citySelect);
-        });
-
-        filterCityOptions(stateSelect, citySelect);
-    }
-
-    // Перевірка наявності елементів після повного завантаження DOM
-    document.addEventListener("DOMContentLoaded", function () {
-        console.log("DOM content loaded");
-        initCityFilter();
-    });
-})();
+  });
+});
