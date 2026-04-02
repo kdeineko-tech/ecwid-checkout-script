@@ -13,40 +13,38 @@ Ecwid.OnAPILoaded.add(function () {
   ec.order = ec.order || {};
   ec.order.extraFields = ec.order.extraFields || {};
 
+  // Штат
   ec.order.extraFields.custom_state = {
     title: STATE_FIELD_LABEL,
     type: "select",
     required: true,
     checkoutDisplaySection: "shipping_address",
-    options: Object.keys(CITY_MAP).map(function (state) {
-      return { title: state };
-    })
+    options: Object.keys(CITY_MAP).map(state => ({ title: state }))
   };
 
+  // Місто
   ec.order.extraFields.custom_city = {
     title: CITY_FIELD_LABEL,
     type: "select",
     required: true,
     checkoutDisplaySection: "shipping_address",
-    options: [] // спочатку порожній
+    options: [] // спочатку порожній select
   };
 
-  // слухаємо зміну штату
-  Ecwid.OnPageLoaded.add(function (page) {
-    if (page.type === "CHECKOUT") {
-      Ecwid.OnCartChanged.add(function (cart) {
-        const stateField = cart.extraFields?.custom_state?.value;
+  // Функція оновлення міст при зміні штату
+  function updateCities(state) {
+    const cities = CITY_MAP[state] || [];
+    ec.order.extraFields.custom_city.options = cities.map(city => ({ title: city }));
+    ec.order.extraFields.custom_city.value = null; // скидаємо вибране місто
+    Ecwid.refreshConfig();
+  }
 
-        if (stateField && CITY_MAP[stateField]) {
-          ec.order.extraFields.custom_city.options = CITY_MAP[stateField].map(function (city) {
-            return { title: city };
-          });
-
-          Ecwid.refreshConfig();
-        }
-      });
+  // Слухаємо зміну поля custom_state
+  Ecwid.OnFieldChanged.add(function (fieldId, value) {
+    if (fieldId === "custom_state") {
+      updateCities(value);
     }
   });
 
-  window.Ecwid && Ecwid.refreshConfig();
+  Ecwid.refreshConfig();
 });
