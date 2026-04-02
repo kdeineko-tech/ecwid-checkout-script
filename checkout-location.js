@@ -28,10 +28,25 @@ Ecwid.OnAPILoaded.add(function () {
     type: "select",
     required: true,
     checkoutDisplaySection: "shipping_address",
-    options: CITY_MAP["Texas"].map(function (city) {
-      return { title: city };
-    })
+    options: [] // спочатку порожній
   };
+
+  // слухаємо зміну штату
+  Ecwid.OnPageLoaded.add(function (page) {
+    if (page.type === "CHECKOUT") {
+      Ecwid.OnCartChanged.add(function (cart) {
+        const stateField = cart.extraFields?.custom_state?.value;
+
+        if (stateField && CITY_MAP[stateField]) {
+          ec.order.extraFields.custom_city.options = CITY_MAP[stateField].map(function (city) {
+            return { title: city };
+          });
+
+          Ecwid.refreshConfig();
+        }
+      });
+    }
+  });
 
   window.Ecwid && Ecwid.refreshConfig();
 });
