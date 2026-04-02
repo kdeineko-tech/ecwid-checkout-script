@@ -3,7 +3,7 @@
   ec.order = ec.order || {};
   ec.order.extraFields = ec.order.extraFields || {};
 
-  // Мапа міст по штатах
+  // Мапа всіх міст по штатах
   const CITY_MAP = {
     California: ["Los Angeles", "San Diego", "San Jose", "Sacramento"],
     Texas: ["Houston", "Dallas", "Austin", "San Antonio"],
@@ -11,44 +11,29 @@
     "New York": ["New York", "Buffalo", "Albany", "Rochester"]
   };
 
-  // Створюємо екстра поле для міста з усіма можливими варіантами
+  // Початкові значення для поля міста
   ec.order.extraFields.city_filter = {
     title: "Choose City",
     type: "select",
     required: true,
     checkoutDisplaySection: "shipping_address",
-    options: [
-      { title: "Please choose" },
-      { title: "Los Angeles" },
-      { title: "San Diego" },
-      { title: "San Jose" },
-      { title: "Sacramento" },
-      { title: "Houston" },
-      { title: "Dallas" },
-      { title: "Austin" },
-      { title: "San Antonio" },
-      { title: "Miami" },
-      { title: "Orlando" },
-      { title: "Tampa" },
-      { title: "Jacksonville" },
-      { title: "New York" },
-      { title: "Buffalo" },
-      { title: "Albany" },
-      { title: "Rochester" }
-    ]
+    options: [{ title: "Please choose" }] // Початкова опція "Please choose"
   };
 
-  // Оновлення доступних міст залежно від вибраного штату
+  // Оновлення списку міст, що відповідають вибраному штату
   function updateCityField(stateValue) {
     const cities = CITY_MAP[stateValue] || [];
+    const options = [{ title: "Please choose" }];
 
-    // Оновлюємо опції для списку міст
-    ec.order.extraFields.city_filter.options = [
-      { title: "Please choose" },
-      ...cities.map(city => ({ title: city })) // Додаємо тільки міста, що відповідають штату
-    ];
+    // Створення нових опцій для міста залежно від вибраного штату
+    cities.forEach(city => {
+      options.push({ title: city });
+    });
 
-    // Оновлюємо конфігурацію Ecwid
+    // Оновлюємо список опцій в кастомному полі міста
+    ec.order.extraFields.city_filter.options = options;
+
+    // Оновлюємо конфігурацію Ecwid для відображення нових варіантів
     window.Ecwid && Ecwid.refreshConfig();
   }
 
@@ -66,8 +51,8 @@
   // Ініціалізація після завантаження сторінки
   function init() {
     bindStateChange();
-    
-    // Після завантаження сторінки — оновлюємо список міст, якщо вже є вибір штату
+
+    // Після завантаження сторінки оновлюємо список міст, якщо вже є вибір штату
     const stateSelect = document.querySelector("select[name='state']");
     if (stateSelect && stateSelect.value) {
       updateCityField(stateSelect.value); // Оновлюємо список міст на основі вибраного штату
