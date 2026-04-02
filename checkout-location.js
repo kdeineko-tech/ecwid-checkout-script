@@ -13,6 +13,10 @@
         return (value || "").replace(/\s+/g, " ").trim().toLowerCase();
     }
 
+    function isCheckoutPage() {
+        return !!document.querySelector(".ec-cart") || !!document.querySelector(".ec-checkout");
+    }
+
     function findSelectByLabelText(labelText) {
         const wanted = normalize(labelText);
         const nodes = Array.from(document.querySelectorAll("label, div, span"));
@@ -24,6 +28,17 @@
             for (let i = 0; i < 5 && current; i += 1) {
                 const selects = current.querySelectorAll("select");
                 if (selects.length === 1) return selects[0];
+
+                if (selects.length > 1) {
+                    for (const select of selects) {
+                        const relation = node.compareDocumentPosition(select);
+                        if (relation & Node.DOCUMENT_POSITION_FOLLOWING) {
+                            return select;
+                        }
+                    }
+                    return selects[0];
+                }
+
                 current = current.parentElement;
             }
         }
@@ -64,7 +79,14 @@
             citySelect.appendChild(option);
         });
 
-        citySelect.value = previousValue || "";
+        const canRestore = options.some((item) => item.value === previousValue);
+        if (canRestore) {
+            citySelect.value = previousValue || "";
+        } else {
+            citySelect.selectedIndex = 0;
+        }
+
+        citySelect.dispatchEvent(new Event("change", { bubbles: true }));
     }
 
     function filterCityOptions(stateSelect, citySelect) {
@@ -76,6 +98,9 @@
         const selectedStateValue = stateSelect.value;
         const selectedStateText =
             stateSelect.options[stateSelect.selectedIndex]?.textContent || "";
+
+        // Лог для дебагу
+        console.log(`Filtering cities for state: ${selectedStateText}`);  
 
         const stateKey = CITY_MAP[selectedStateValue] ? selectedStateValue : selectedStateText;
 
@@ -107,6 +132,7 @@
     }
 
     function initCityFilter() {
+        // Перевіряємо наявність необхідних елементів
         const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
         const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
 
@@ -115,6 +141,7 @@
             return;
         }
 
+        // Перевірка, чи не ініціалізовано вже фільтрування
         if (citySelect.dataset.cityFilterInitialized === "1") return;
         citySelect.dataset.cityFilterInitialized = "1";
 
@@ -124,8 +151,10 @@
             filterCityOptions(stateSelect, citySelect);
         });
 
+        // Викликаємо фільтрацію під час ініціалізації
         filterCityOptions(stateSelect, citySelect);
     }
 
+    // Перевіряємо наявність елементів після повного завантаження DOM
     document.addEventListener("DOMContentLoaded", initCityFilter);
 })();
