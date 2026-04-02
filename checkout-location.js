@@ -78,7 +78,7 @@
     wrapper.style.marginTop = "16px";
 
     wrapper.innerHTML = `
-      <select id="${CUSTOM_CITY_SELECT_ID}" class="form-control__select" style="width:100%; padding:12px; border:1px solid #cfd7df; border-radius:4px;">
+      <select id="${CUSTOM_CITY_SELECT_ID}" style="width:100%; padding:12px; border:1px solid #cfd7df; border-radius:4px;">
         <option value="">Please choose</option>
       </select>
     `;
@@ -134,8 +134,8 @@
   function init() {
     if (!isCheckoutPage()) return;
 
-    const stateSelect = findSelectByLabelText("Choose State");
-    const citySelect = findSelectByLabelText("Choose City");
+    const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
+    const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
 
     if (!stateSelect || !citySelect) return;
     if (stateSelect.dataset.cityProxyInitialized === "1") return;
