@@ -1,0 +1,17 @@
+{
+  "CA": {
+    "name": "California",
+    "locations": [
+      "Los Angeles - Pick Up Center 1",
+      "San Francisco - Pick Up Center 2",
+      "San Diego - Pick Up Center 3"
+    ]
+  },
+  "NY": {
+    "name": "New York",
+    "locations": [
+      "New York City - Pick Up Center 1",
+      "Buffalo - Pick Up Center 2"
+    ]
+  }
+}
