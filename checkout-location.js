@@ -90,6 +90,11 @@
     }
 
     function filterCityOptions(stateSelect, citySelect) {
+        if (!stateSelect || !citySelect) {
+            console.error('State or City select element not found!');
+            return;
+        }
+
         const selectedStateValue = stateSelect.value;
         const selectedStateText =
             stateSelect.options[stateSelect.selectedIndex]?.textContent || "";
@@ -145,7 +150,7 @@
         const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
 
         if (!stateSelect || !citySelect) {
-            console.log("State or City field not found!");  // Лог для дебагу
+            console.error('State or City select element not found!');
             return;
         }
 
