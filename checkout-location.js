@@ -3,13 +3,13 @@ Ecwid.OnAPILoaded.add(function () {
   ec.order = ec.order || {};
   ec.order.extraFields = ec.order.extraFields || {};
 
-  ec.order.extraFields.wrapping_box_signature = {
-    title: 'How should we sign the package?',
-    textPlaceholder: 'Package sign',
+  ec.order.extraFields.delivery_comment = {
+    title: 'Delivery comment',
     type: 'text',
+    textPlaceholder: 'Enter comment',
     required: false,
     checkoutDisplaySection: 'shipping_address'
   };
 
-  Ecwid.refreshConfig && Ecwid.refreshConfig();
+  window.Ecwid && Ecwid.refreshConfig();
 });
