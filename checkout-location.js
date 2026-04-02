@@ -1,297 +1,255 @@
 (function () {
   // =========================
-  // 1) НАЛАШТУВАННЯ
+  // 1) ДАНІ: ШТАТ -> МІСТА
+  // Замініть на ваш повний список
   // =========================
+  const STATE_CITY_MAP = {
+    "California": ["Los Angeles", "San Diego", "San Jose"],
+    "Texas": ["Austin", "Dallas", "Houston"],
+    "Florida": ["Miami", "Orlando", "Tampa"]
+  };
 
-  // Унікальні ключі extra fields у Ecwid order.extraFields
+  // =========================
+  // 2) НАЛАШТУВАННЯ ПОЛІВ
+  // =========================
   const FIELD_KEYS = {
-    state: 'shipping_state_custom',
-    city: 'shipping_city_custom'
+    state: "custom_shipping_state",
+    city: "custom_shipping_city"
   };
 
-  // Назви полів на checkout.
-  // Краще робити їх унікальними, щоб не конфліктували з нативними полями Ecwid.
-  const FIELD_TITLES = {
-    state: 'Shipping State',
-    city: 'Shipping City'
+  const FIELD_LABELS = {
+    state: "State",
+    city: "City"
   };
 
-  // localStorage ключі для збереження вибору між refreshConfig / rerender
-  const STORAGE_KEYS = {
-    state: 'ecwid_shipping_state_custom',
-    city: 'ecwid_shipping_city_custom'
+  const PLACEHOLDERS = {
+    state: "Select state",
+    city: "Select city"
   };
 
-  // Демо-дані.
-  // Замiни на свій реальний список.
-  // Рекомендовано зберігати саме code + label, якщо потім захочеш синкати у native shipping address.
-  const LOCATION_DATA = {
-    CA: {
-      label: 'California',
-      cities: ['Los Angeles', 'San Diego', 'San Jose', 'Sacramento']
-    },
-    TX: {
-      label: 'Texas',
-      cities: ['Austin', 'Dallas', 'Houston', 'San Antonio']
-    },
-    FL: {
-      label: 'Florida',
-      cities: ['Miami', 'Orlando', 'Tampa', 'Jacksonville']
-    }
-  };
+  let extraFieldsInitialized = false;
 
-  // Якщо хочеш показувати поля лише для певної країни
-  // (наприклад, лише для США), залиш true і COUNTRY_CODES = ['US'].
-  const LIMIT_BY_COUNTRY = true;
-  const COUNTRY_CODES = ['US'];
-
-  // =========================
-  // 2) ДОПОМІЖНІ ФУНКЦІЇ
-  // =========================
-
-  function normalize(value) {
-    return String(value || '').trim();
+  function normalizeText(text) {
+    return (text || "").replace(/\s+/g, " ").trim().toLowerCase();
   }
 
-  function getSavedSelections() {
-    return {
-      state: normalize(localStorage.getItem(STORAGE_KEYS.state)),
-      city: normalize(localStorage.getItem(STORAGE_KEYS.city))
-    };
+  function makeOptions(values) {
+    return values.map(function (value) {
+      return { title: value };
+    });
   }
 
-  function saveState(value) {
-    localStorage.setItem(STORAGE_KEYS.state, normalize(value));
-  }
-
-  function saveCity(value) {
-    localStorage.setItem(STORAGE_KEYS.city, normalize(value));
-  }
-
-  function clearSavedSelections() {
-    localStorage.removeItem(STORAGE_KEYS.state);
-    localStorage.removeItem(STORAGE_KEYS.city);
-  }
-
-  function getStateCodes() {
-    return Object.keys(LOCATION_DATA);
-  }
-
-  function getStateLabelByCode(code) {
-    return LOCATION_DATA[code] ? LOCATION_DATA[code].label : '';
-  }
-
-  function getStateCodeByLabel(label) {
-    const normalizedLabel = normalize(label).toLowerCase();
-    return getStateCodes().find((code) => {
-      return normalize(LOCATION_DATA[code].label).toLowerCase() === normalizedLabel;
-    }) || '';
-  }
-
-  function getCitiesByStateLabel(stateLabel) {
-    const stateCode = getStateCodeByLabel(stateLabel);
-    return stateCode && LOCATION_DATA[stateCode]
-      ? LOCATION_DATA[stateCode].cities
-      : [];
-  }
-
-  function buildStateOptions() {
-    return getStateCodes().map((code) => ({
-      title: LOCATION_DATA[code].label
-    }));
-  }
-
-  function buildCityOptions(stateLabel) {
-    return getCitiesByStateLabel(stateLabel).map((city) => ({
-      title: city
-    }));
-  }
-
-  function stateExists(stateLabel) {
-    return Boolean(getStateCodeByLabel(stateLabel));
-  }
-
-  function cityExistsForState(stateLabel, city) {
-    return getCitiesByStateLabel(stateLabel).includes(city);
+  function getSortedStates() {
+    return Object.keys(STATE_CITY_MAP).sort(function (a, b) {
+      return a.localeCompare(b);
+    });
   }
 
   // =========================
-  // 3) ПОБУДОВА EXTRA FIELDS
+  // 3) СТВОРЮЄМО 2 NATIVE ECWID EXTRA FIELDS
+  //    Вони будуть збережені в замовленні
   // =========================
-
-  function applyExtraFields(selectedState, selectedCity) {
-    const validState = stateExists(selectedState) ? selectedState : '';
-    const validCity = cityExistsForState(validState, selectedCity) ? selectedCity : '';
-    const hasState = Boolean(validState);
+  function ensureExtraFields() {
+    if (extraFieldsInitialized) return;
 
     window.ec = window.ec || {};
-    window.ec.order = window.ec.order || {};
-    window.ec.order.extraFields = window.ec.order.extraFields || {};
+    ec.order = ec.order || {};
+    ec.order.extraFields = ec.order.extraFields || {};
 
-    // Поле штату
-    window.ec.order.extraFields[FIELD_KEYS.state] = {
-      title: FIELD_TITLES.state,
-      type: 'select',
-      options: buildStateOptions(),
+    ec.order.extraFields[FIELD_KEYS.state] = {
+      title: FIELD_LABELS.state,
+      type: "select",
       required: true,
-      checkoutDisplaySection: 'shipping_address',
-      orderDetailsDisplaySection: 'shipping_info',
+      checkoutDisplaySection: "shipping_address",
+      orderDetailsDisplaySection: "shipping_info",
       showInNotifications: true,
-      value: validState,
-      showForCountry: LIMIT_BY_COUNTRY ? COUNTRY_CODES : undefined
+      showInInvoice: true,
+      options: makeOptions([PLACEHOLDERS.state].concat(getSortedStates()))
     };
 
-    // Поле міста
-    // До вибору штату поле приховане, після вибору - показується з потрібним списком міст
-    window.ec.order.extraFields[FIELD_KEYS.city] = {
-      title: FIELD_TITLES.city,
-      type: 'select',
-      options: hasState ? buildCityOptions(validState) : [{ title: 'Select state first' }],
-      available: hasState,
-      required: hasState,
-      checkoutDisplaySection: 'shipping_address',
-      orderDetailsDisplaySection: 'shipping_info',
+    ec.order.extraFields[FIELD_KEYS.city] = {
+      title: FIELD_LABELS.city,
+      type: "select",
+      required: true,
+      checkoutDisplaySection: "shipping_address",
+      orderDetailsDisplaySection: "shipping_info",
       showInNotifications: true,
-      value: validCity,
-      showForCountry: LIMIT_BY_COUNTRY ? COUNTRY_CODES : undefined
+      showInInvoice: true,
+      options: makeOptions([PLACEHOLDERS.city])
     };
 
-    if (window.Ecwid && typeof window.Ecwid.refreshConfig === 'function') {
-      window.Ecwid.refreshConfig();
+    extraFieldsInitialized = true;
+
+    if (window.Ecwid && typeof Ecwid.refreshConfig === "function") {
+      Ecwid.refreshConfig();
     }
   }
 
   // =========================
-  // 4) ПОШУК SELECT У DOM
+  // 4) ПОШУК SELECT ПО ЇХ LABEL
+  //    Ecwid може трохи міняти DOM, тому тут кілька fallback-варіантів
   // =========================
-  // Ecwid не дає окремого built-in API для "dependent select",
-  // тому нижче — робочий DOM-based шар, який відслідковує вибір штату
-  // і перебудовує список міст.
+  function findSelectByLabel(labelText) {
+    const wanted = normalizeText(labelText);
 
-  function textContainsFieldTitle(text, title) {
-    return normalize(text).toLowerCase().includes(normalize(title).toLowerCase());
-  }
+    // Варіант 1: класичний label[for]
+    const labels = Array.from(document.querySelectorAll("label"));
+    for (const label of labels) {
+      if (!normalizeText(label.textContent).includes(wanted)) continue;
 
-  function findSelectByFieldTitle(title) {
-    const selects = Array.from(document.querySelectorAll('select'));
-
-    for (const select of selects) {
-      const container =
-        select.closest('label') ||
-        select.closest('[class*="field"]') ||
-        select.closest('[class*="form"]') ||
-        select.parentElement;
-
-      const blob = [
-        select.getAttribute('aria-label') || '',
-        select.name || '',
-        select.id || '',
-        container ? container.textContent : '',
-        select.parentElement ? select.parentElement.textContent : ''
-      ].join(' ');
-
-      if (textContainsFieldTitle(blob, title)) {
-        return select;
+      const forId = label.getAttribute("for");
+      if (forId) {
+        const target = document.getElementById(forId);
+        if (target && target.tagName === "SELECT") return target;
       }
+
+      const nestedSelect = label.querySelector("select");
+      if (nestedSelect) return nestedSelect;
+
+      const parent = label.closest("div");
+      if (parent) {
+        const nearby = parent.querySelector("select") ||
+          (parent.parentElement ? parent.parentElement.querySelector("select") : null);
+        if (nearby) return nearby;
+      }
+    }
+
+    // Варіант 2: пошук по будь-якому елементу з текстом label
+    const candidates = Array.from(
+      document.querySelectorAll("div, span, p, label")
+    );
+
+    for (const el of candidates) {
+      if (!normalizeText(el.textContent).includes(wanted)) continue;
+
+      const block = el.closest("div");
+      if (!block) continue;
+
+      const select = block.querySelector("select") ||
+        (block.parentElement ? block.parentElement.querySelector("select") : null);
+
+      if (select) return select;
     }
 
     return null;
   }
 
   // =========================
-  // 5) BIND LISTENERS
+  // 5) ОНОВЛЕННЯ СПИСКУ МІСТ У НАТИВНОМУ SELECT Ecwid
+  //    Поле залишається Ecwid-полем, тому значення піде в order extraFields
   // =========================
+  function rebuildCitySelect(citySelect, cities, selectedValue) {
+    if (!citySelect) return;
 
-  let rebindTimeout = null;
-  let observerStarted = false;
+    citySelect.innerHTML = "";
 
-  function scheduleBind() {
-    clearTimeout(rebindTimeout);
-    rebindTimeout = setTimeout(bindListeners, 250);
-  }
+    const placeholderOption = new Option(
+      PLACEHOLDERS.city,
+      PLACEHOLDERS.city,
+      false,
+      false
+    );
+    citySelect.add(placeholderOption);
 
-  function bindListeners() {
-    const stateSelect = findSelectByFieldTitle(FIELD_TITLES.state);
-    const citySelect = findSelectByFieldTitle(FIELD_TITLES.city);
+    cities.forEach(function (city) {
+      citySelect.add(new Option(city, city, false, false));
+    });
 
-    if (stateSelect && !stateSelect.dataset.ecwidBoundState) {
-      stateSelect.dataset.ecwidBoundState = '1';
-
-      stateSelect.addEventListener('change', function () {
-        const newState = normalize(stateSelect.value);
-
-        saveState(newState);
-        saveCity('');
-
-        // При зміні штату перебудовуємо поле міста
-        applyExtraFields(newState, '');
-
-        // Після refreshConfig Ecwid перемалює checkout
-        // тому треба знову підвісити listener-и
-        setTimeout(bindListeners, 400);
-      });
+    if (selectedValue && cities.includes(selectedValue)) {
+      citySelect.value = selectedValue;
+    } else {
+      citySelect.value = PLACEHOLDERS.city;
     }
 
-    if (citySelect && !citySelect.dataset.ecwidBoundCity) {
-      citySelect.dataset.ecwidBoundCity = '1';
-
-      citySelect.addEventListener('change', function () {
-        saveCity(normalize(citySelect.value));
-      });
-    }
+    citySelect.dispatchEvent(new Event("input", { bubbles: true }));
+    citySelect.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
-  function startDomObserver() {
-    if (observerStarted || !document.body) return;
+  function bindCascadeLogic() {
+    const stateSelect = findSelectByLabel(FIELD_LABELS.state);
+    const citySelect = findSelectByLabel(FIELD_LABELS.city);
 
-    observerStarted = true;
+    if (!stateSelect || !citySelect) return false;
+
+    if (stateSelect.dataset.cascadeBound === "1") {
+      // якщо вже підв'язано, просто оновимо міста при повторному рендері
+      const currentState = stateSelect.value;
+      const currentCity = citySelect.value;
+      const cities = STATE_CITY_MAP[currentState] || [];
+      rebuildCitySelect(citySelect, cities, currentCity);
+      citySelect.disabled = !cities.length || currentState === PLACEHOLDERS.state;
+      return true;
+    }
+
+    stateSelect.dataset.cascadeBound = "1";
+
+    // Початковий стан при reload/back
+    (function initCurrentState() {
+      const currentState = stateSelect.value;
+      const currentCity = citySelect.value;
+      const cities = STATE_CITY_MAP[currentState] || [];
+
+      rebuildCitySelect(citySelect, cities, currentCity);
+      citySelect.disabled = !cities.length || currentState === PLACEHOLDERS.state;
+    })();
+
+    stateSelect.addEventListener("change", function () {
+      const selectedState = stateSelect.value;
+      const cities = STATE_CITY_MAP[selectedState] || [];
+
+      rebuildCitySelect(citySelect, cities, "");
+      citySelect.disabled = !cities.length || selectedState === PLACEHOLDERS.state;
+    });
+
+    return true;
+  }
+
+  function observeCheckoutAndBind() {
+    let observerStopped = false;
 
     const observer = new MutationObserver(function () {
-      scheduleBind();
+      const ok = bindCascadeLogic();
+      if (ok && !observerStopped) {
+        observer.disconnect();
+        observerStopped = true;
+      }
     });
 
     observer.observe(document.body, {
       childList: true,
       subtree: true
     });
+
+    // fallback
+    setTimeout(function () {
+      if (!observerStopped) {
+        bindCascadeLogic();
+        observer.disconnect();
+        observerStopped = true;
+      }
+    }, 10000);
   }
 
   // =========================
-  // 6) INIT
+  // 6) ІНІЦІАЛІЗАЦІЯ
   // =========================
+  if (window.Ecwid && Ecwid.OnAPILoaded) {
+    Ecwid.OnAPILoaded.add(function () {
+      ensureExtraFields();
 
-  function init() {
-    const saved = getSavedSelections();
+      if (Ecwid.OnPageLoaded) {
+        Ecwid.OnPageLoaded.add(function (page) {
+          const checkoutPages = [
+            "CHECKOUT_ADDRESS",
+            "CHECKOUT_ADDRESS_BOOK",
+            "CHECKOUT_PAYMENT_DETAILS"
+          ];
 
-    // Базово створюємо поля один раз при завантаженні storefront JS
-    applyExtraFields(saved.state, saved.city);
-
-    // Підключаємо відслідковування checkout сторінки
-    startDomObserver();
-
-    if (window.Ecwid && window.Ecwid.OnPageLoaded && window.Ecwid.OnPageLoaded.add) {
-      window.Ecwid.OnPageLoaded.add(function (page) {
-        if (
-          page.type === 'CHECKOUT_ADDRESS' ||
-          page.type === 'CHECKOUT_ADDRESS_BOOK' ||
-          page.type === 'CHECKOUT_DELIVERY' ||
-          page.type === 'CHECKOUT_PAYMENT_DETAILS'
-        ) {
-          scheduleBind();
-        }
-      });
-    }
-
-    if (window.Ecwid && window.Ecwid.OnOrderPlaced && window.Ecwid.OnOrderPlaced.add) {
-      window.Ecwid.OnOrderPlaced.add(function () {
-        clearSavedSelections();
-      });
-    }
-  }
-
-  if (window.Ecwid && window.Ecwid.OnAPILoaded && window.Ecwid.OnAPILoaded.add) {
-    window.Ecwid.OnAPILoaded.add(init);
-  } else {
-    document.addEventListener('DOMContentLoaded', init);
+          if (checkoutPages.includes(page.type)) {
+            observeCheckoutAndBind();
+          }
+        });
+      }
+    });
   }
 })();
