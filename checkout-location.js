@@ -76,9 +76,12 @@
     const wrapper = document.createElement("div");
     wrapper.id = CUSTOM_CITY_WRAPPER_ID;
     wrapper.style.marginTop = "16px";
+    wrapper.style.display = "flex";
+    wrapper.style.alignItems = "center";  // Align vertically
+    wrapper.style.gap = "8px";  // Small gap between state and city dropdowns
 
     wrapper.innerHTML = `
-      <label for="${CUSTOM_CITY_SELECT_ID}" style="display:block; font-weight:600; margin-bottom:8px;">
+      <label for="${CUSTOM_CITY_SELECT_ID}" style="font-weight:600; margin-bottom:8px;">
         Choose City
       </label>
       <select id="${CUSTOM_CITY_SELECT_ID}" style="width:100%; padding:12px; border:1px solid #cfd7df; border-radius:4px;">
@@ -137,8 +140,8 @@
   function init() {
     if (!isCheckoutPage()) return;
 
-    const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
-    const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
+    const stateSelect = findSelectByLabelText("Choose State");
+    const citySelect = findSelectByLabelText("Choose City");
 
     if (!stateSelect || !citySelect) return;
     if (stateSelect.dataset.cityProxyInitialized === "1") return;
