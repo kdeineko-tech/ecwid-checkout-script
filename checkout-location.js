@@ -1,6 +1,6 @@
 (function () {
-    const STATE_FIELD_LABEL = "Choose State";
-    const CITY_FIELD_LABEL = "Choose City";
+    const STATE_FIELD_NAME = "province";  // Використовуємо name або id
+    const CITY_FIELD_NAME = "city";      // Використовуємо name або id
 
     const CITY_MAP = {
         "California": ["Los Angeles", "San Diego", "San Jose", "Sacramento"],
@@ -13,37 +13,8 @@
         return (value || "").replace(/\s+/g, " ").trim().toLowerCase();
     }
 
-    function isCheckoutPage() {
-        return !!document.querySelector(".ec-cart") || !!document.querySelector(".ec-checkout");
-    }
-
-    function findSelectByLabelText(labelText) {
-        const wanted = normalize(labelText);
-        const nodes = Array.from(document.querySelectorAll("label, div, span"));
-
-        for (const node of nodes) {
-            if (normalize(node.textContent) !== wanted) continue;
-
-            let current = node;
-            for (let i = 0; i < 5 && current; i += 1) {
-                const selects = current.querySelectorAll("select");
-                if (selects.length === 1) return selects[0];
-
-                if (selects.length > 1) {
-                    for (const select of selects) {
-                        const relation = node.compareDocumentPosition(select);
-                        if (relation & Node.DOCUMENT_POSITION_FOLLOWING) {
-                            return select;
-                        }
-                    }
-                    return selects[0];
-                }
-
-                current = current.parentElement;
-            }
-        }
-
-        return null;
+    function findSelectByNameOrId(nameOrId) {
+        return document.querySelector(`select[name="${nameOrId}"], select[id="${nameOrId}"]`);
     }
 
     function saveOriginalCityOptions(citySelect) {
@@ -79,14 +50,7 @@
             citySelect.appendChild(option);
         });
 
-        const canRestore = options.some((item) => item.value === previousValue);
-        if (canRestore) {
-            citySelect.value = previousValue || "";
-        } else {
-            citySelect.selectedIndex = 0;
-        }
-
-        citySelect.dispatchEvent(new Event("change", { bubbles: true }));
+        citySelect.value = previousValue || "";
     }
 
     function filterCityOptions(stateSelect, citySelect) {
@@ -96,13 +60,11 @@
         }
 
         const selectedStateValue = stateSelect.value;
-        const selectedStateText =
-            stateSelect.options[stateSelect.selectedIndex]?.textContent || "";
 
         // Лог для дебагу
-        console.log(`Filtering cities for state: ${selectedStateText}`);  
+        console.log(`Filtering cities for state: ${selectedStateValue}`);  
 
-        const stateKey = CITY_MAP[selectedStateValue] ? selectedStateValue : selectedStateText;
+        const stateKey = CITY_MAP[selectedStateValue] ? selectedStateValue : "";
 
         const originalOptions = getOriginalCityOptions(citySelect);
 
@@ -132,16 +94,16 @@
     }
 
     function initCityFilter() {
-        // Перевіряємо наявність необхідних елементів
-        const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
-        const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
+        const stateSelect = findSelectByNameOrId(STATE_FIELD_NAME);
+        const citySelect = findSelectByNameOrId(CITY_FIELD_NAME);
 
         if (!stateSelect || !citySelect) {
             console.error('State or City select element not found!');
             return;
         }
 
-        // Перевірка, чи не ініціалізовано вже фільтрування
+        console.log("State and City fields found.");  // Лог для дебагу
+
         if (citySelect.dataset.cityFilterInitialized === "1") return;
         citySelect.dataset.cityFilterInitialized = "1";
 
@@ -151,10 +113,12 @@
             filterCityOptions(stateSelect, citySelect);
         });
 
-        // Викликаємо фільтрацію під час ініціалізації
         filterCityOptions(stateSelect, citySelect);
     }
 
-    // Перевіряємо наявність елементів після повного завантаження DOM
-    document.addEventListener("DOMContentLoaded", initCityFilter);
+    // Перевірка наявності елементів після повного завантаження DOM
+    document.addEventListener("DOMContentLoaded", function () {
+        console.log("DOM content loaded");
+        initCityFilter();
+    });
 })();
