@@ -102,6 +102,8 @@
 
     if (!originalOptions.length) return;
 
+    console.log(`Filtering cities for state: ${stateKey}`);  // Лог для дебагу
+
     if (!stateKey || !CITY_MAP[stateKey]) {
       rebuildCityOptions(citySelect, originalOptions);
       return;
@@ -135,7 +137,12 @@
     const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
     const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
 
-    if (!stateSelect || !citySelect) return;
+    if (!stateSelect || !citySelect) {
+      console.log("State or City field not found!");  // Лог для дебагу
+      return;
+    }
+
+    console.log("State and City fields found.");  // Лог для дебагу
 
     if (citySelect.dataset.cityFilterInitialized === "1") return;
     citySelect.dataset.cityFilterInitialized = "1";
@@ -148,7 +155,7 @@
 
     filterCityOptions(stateSelect, citySelect);
 
-    console.log("City filter initialized");
+    console.log("City filter initialized");  // Лог для дебагу
   }
 
   const observer = new MutationObserver(function () {
