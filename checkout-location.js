@@ -104,6 +104,9 @@
 
     console.log(`Filtering cities for state: ${stateKey}`);  // Лог для дебагу
 
+    // Очищаємо вибір міста, коли вибирається новий штат
+    citySelect.value = "";
+
     if (!stateKey || !CITY_MAP[stateKey]) {
       rebuildCityOptions(citySelect, originalOptions);
       return;
