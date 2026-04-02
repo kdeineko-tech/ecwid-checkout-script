@@ -46,44 +46,14 @@
     return null;
   }
 
-  function saveOriginalCityOptions(citySelect) {
-    if (citySelect.dataset.originalOptionsSaved === "1") return;
-
-    // ✅ Зберігаємо text як еталон, value використовуємо як fallback
-    const options = Array.from(citySelect.options).map((option) => ({
-      value: option.value,
-      text: option.textContent.trim(),
-      disabled: option.disabled
-    }));
-
-    citySelect.dataset.originalOptions = JSON.stringify(options);
-    citySelect.dataset.originalOptionsSaved = "1";
-  }
-
-  function getOriginalCityOptions(citySelect) {
-    try {
-      return JSON.parse(citySelect.dataset.originalOptions || "[]");
-    } catch (e) {
-      return [];
-    }
-  }
-
-  function rebuildCityOptions(citySelect, options) {
-    citySelect.innerHTML = "";
-
-    options.forEach(item => {
-      const option = document.createElement("option");
-      // ✅ Головний фікс: value = text щоб вони завжди збігались
-      option.value = item.text || item.value;
-      option.textContent = item.text;
-      option.disabled = !!item.disabled;
-      citySelect.appendChild(option);
-    });
-
-    const firstValid = Array.from(citySelect.options).find(opt => opt.value && !opt.disabled);
-    citySelect.value = firstValid ? firstValid.value : "";
-
-    citySelect.dispatchEvent(new Event("change", { bubbles: true }));
+  function isPlaceholder(option) {
+    const text = normalize(option.textContent);
+    return (
+      !option.value ||
+      text.includes("please choose") ||
+      text.includes("select") ||
+      text.includes("choose")
+    );
   }
 
   function filterCityOptions(stateSelect, citySelect) {
@@ -93,37 +63,43 @@
 
     const stateKey = CITY_MAP[selectedStateValue]
       ? selectedStateValue
-      : selectedStateText;
+      : normalize(selectedStateText);
 
-    const originalOptions = getOriginalCityOptions(citySelect);
+    // Шукаємо ключ без normalize теж
+    const resolvedKey = CITY_MAP[selectedStateValue]
+      ? selectedStateValue
+      : Object.keys(CITY_MAP).find(k => normalize(k) === normalize(selectedStateText));
 
-    if (!originalOptions.length) return;
+    console.log(`Filtering cities for state: ${resolvedKey}`);
 
-    console.log(`Filtering cities for state: ${stateKey}`);
+    const allowedCities = resolvedKey && CITY_MAP[resolvedKey]
+      ? CITY_MAP[resolvedKey].map(normalize)
+      : null;
 
-    if (!stateKey || !CITY_MAP[stateKey]) {
-      rebuildCityOptions(citySelect, originalOptions);
-      return;
+    let firstVisible = null;
+
+    Array.from(citySelect.options).forEach(option => {
+      if (isPlaceholder(option)) {
+        option.style.display = "";
+        return;
+      }
+
+      const cityText = normalize(option.textContent);
+
+      if (!allowedCities || allowedCities.includes(cityText)) {
+        option.style.display = "";
+        if (!firstVisible) firstVisible = option;
+      } else {
+        option.style.display = "none";
+      }
+    });
+
+    // Якщо поточний вибір захований — переключаємо на перший видимий
+    const currentOption = citySelect.options[citySelect.selectedIndex];
+    if (currentOption && currentOption.style.display === "none") {
+      citySelect.value = firstVisible ? firstVisible.value : "";
+      citySelect.dispatchEvent(new Event("change", { bubbles: true }));
     }
-
-    const allowedCities = CITY_MAP[stateKey].map(normalize);
-
-    const placeholderOptions = originalOptions.filter((item) => {
-      const text = normalize(item.text);
-      return (
-        !item.value ||
-        text.includes("please choose") ||
-        text.includes("select") ||
-        text.includes("choose")
-      );
-    });
-
-    // ✅ Фільтруємо виключно по text
-    const filteredCityOptions = originalOptions.filter((item) => {
-      return allowedCities.includes(normalize(item.text));
-    });
-
-    rebuildCityOptions(citySelect, [...placeholderOptions, ...filteredCityOptions]);
   }
 
   function initCityFilter() {
@@ -141,8 +117,6 @@
 
     if (citySelect.dataset.cityFilterInitialized === "1") return;
     citySelect.dataset.cityFilterInitialized = "1";
-
-    saveOriginalCityOptions(citySelect);
 
     stateSelect.addEventListener("change", function () {
       filterCityOptions(stateSelect, citySelect);
