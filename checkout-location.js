@@ -14,10 +14,12 @@
     }
 
     function findSelectByNameOrId(nameOrId) {
+        console.log(`Finding select for ${nameOrId}`);
         return document.querySelector(`select[name="${nameOrId}"], select[id="${nameOrId}"]`);
     }
 
     function saveOriginalCityOptions(citySelect) {
+        console.log('Saving original city options');
         if (citySelect.dataset.originalOptionsSaved === "1") return;
 
         const options = Array.from(citySelect.options).map((option) => ({
@@ -31,6 +33,7 @@
     }
 
     function getOriginalCityOptions(citySelect) {
+        console.log('Getting original city options');
         try {
             return JSON.parse(citySelect.dataset.originalOptions || "[]");
         } catch (e) {
@@ -39,6 +42,7 @@
     }
 
     function rebuildCityOptions(citySelect, options) {
+        console.log('Rebuilding city options');
         const previousValue = citySelect.value;
         citySelect.innerHTML = "";
 
@@ -62,7 +66,7 @@
         const selectedStateValue = stateSelect.value;
 
         // Лог для дебагу
-        console.log(`Filtering cities for state: ${selectedStateValue}`);  
+        console.log(`Filtering cities for state: ${selectedStateValue}`);
 
         const stateKey = CITY_MAP[selectedStateValue] ? selectedStateValue : "";
 
@@ -94,6 +98,8 @@
     }
 
     function initCityFilter() {
+        console.log("Initializing city filter...");
+
         const stateSelect = findSelectByNameOrId(STATE_FIELD_NAME);
         const citySelect = findSelectByNameOrId(CITY_FIELD_NAME);
 
