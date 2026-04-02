@@ -79,6 +79,7 @@
     wrapper.style.display = "flex";
     wrapper.style.alignItems = "center";  // Align vertically
     wrapper.style.gap = "8px";  // Small gap between state and city dropdowns
+    wrapper.style.width = "100%"; // Ensures it fills the width
 
     wrapper.innerHTML = `
       <label for="${CUSTOM_CITY_SELECT_ID}" style="font-weight:600; margin-bottom:8px;">
