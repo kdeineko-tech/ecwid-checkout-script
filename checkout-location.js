@@ -78,9 +78,6 @@
     wrapper.style.marginTop = "16px";
 
     wrapper.innerHTML = `
-      <label for="${CUSTOM_CITY_SELECT_ID}" style="display:block; font-weight:600; margin-bottom:8px;">
-        Choose City
-      </label>
       <select id="${CUSTOM_CITY_SELECT_ID}" style="width:100%; padding:12px; border:1px solid #cfd7df; border-radius:4px;">
         <option value="">Please choose</option>
       </select>
