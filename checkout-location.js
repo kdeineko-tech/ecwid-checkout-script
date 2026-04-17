@@ -25,24 +25,12 @@
       if (normalize(node.textContent) !== wanted) continue;
 
       let current = node;
-      for (let i = 0; i < 5 && current; i += 1) {
+      for (let i = 0; i < 6 && current; i++) {
         const selects = current.querySelectorAll("select");
-        if (selects.length === 1) return selects[0];
-
-        if (selects.length > 1) {
-          for (const select of selects) {
-            const relation = node.compareDocumentPosition(select);
-            if (relation & Node.DOCUMENT_POSITION_FOLLOWING) {
-              return select;
-            }
-          }
-          return selects[0];
-        }
-
+        if (selects.length) return selects[0];
         current = current.parentElement;
       }
     }
-
     return null;
   }
 
@@ -56,25 +44,23 @@
     );
   }
 
+  function getAllowedCities(stateText) {
+    const normalized = normalize(stateText);
+
+    const key = Object.keys(CITY_MAP).find(
+      k => normalize(k) === normalized
+    );
+
+    return key ? CITY_MAP[key].map(normalize) : null;
+  }
+
   function filterCityOptions(stateSelect, citySelect) {
-    const selectedStateValue = stateSelect.value;
-    const selectedStateText =
+    if (!stateSelect || !citySelect) return;
+
+    const stateText =
       stateSelect.options[stateSelect.selectedIndex]?.textContent || "";
 
-    const stateKey = CITY_MAP[selectedStateValue]
-      ? selectedStateValue
-      : normalize(selectedStateText);
-
-    // Шукаємо ключ без normalize теж
-    const resolvedKey = CITY_MAP[selectedStateValue]
-      ? selectedStateValue
-      : Object.keys(CITY_MAP).find(k => normalize(k) === normalize(selectedStateText));
-
-    console.log(`Filtering cities for state: ${resolvedKey}`);
-
-    const allowedCities = resolvedKey && CITY_MAP[resolvedKey]
-      ? CITY_MAP[resolvedKey].map(normalize)
-      : null;
+    const allowedCities = getAllowedCities(stateText);
 
     let firstVisible = null;
 
@@ -84,9 +70,9 @@
         return;
       }
 
-      const cityText = normalize(option.textContent);
+      const city = normalize(option.textContent);
 
-      if (!allowedCities || allowedCities.includes(cityText)) {
+      if (!allowedCities || allowedCities.includes(city)) {
         option.style.display = "";
         if (!firstVisible) firstVisible = option;
       } else {
@@ -94,50 +80,61 @@
       }
     });
 
-    // Якщо поточний вибір захований — переключаємо на перший видимий
-    const currentOption = citySelect.options[citySelect.selectedIndex];
-    if (currentOption && currentOption.style.display === "none") {
+    const current = citySelect.options[citySelect.selectedIndex];
+    if (current && current.style.display === "none") {
       citySelect.value = firstVisible ? firstVisible.value : "";
       citySelect.dispatchEvent(new Event("change", { bubbles: true }));
     }
   }
 
-  function initCityFilter() {
+  // 🧠 SINGLE GLOBAL HANDLER (no duplicates ever)
+  function attachDelegatedListener() {
+    if (window.__ecwidCityFilterAttached) return;
+    window.__ecwidCityFilterAttached = true;
+
+    document.addEventListener("change", function (e) {
+      const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
+      const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
+
+      if (!stateSelect || !citySelect) return;
+      if (e.target !== stateSelect) return;
+
+      filterCityOptions(stateSelect, citySelect);
+    });
+  }
+
+  // 🔁 retry until Ecwid renders fields
+  function initWithRetry(retries = 20) {
     if (!isCheckoutPage()) return;
 
     const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
     const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
 
     if (!stateSelect || !citySelect) {
-      console.log("State or City field not found!");
+      if (retries > 0) {
+        setTimeout(() => initWithRetry(retries - 1), 300);
+      }
       return;
     }
 
-    console.log("State and City fields found.");
-
-    if (citySelect.dataset.cityFilterInitialized === "1") return;
-    citySelect.dataset.cityFilterInitialized = "1";
-
-    stateSelect.addEventListener("change", function () {
-      filterCityOptions(stateSelect, citySelect);
-    });
-
     filterCityOptions(stateSelect, citySelect);
-
-    console.log("City filter initialized");
   }
 
-  const observer = new MutationObserver(function () {
-    initCityFilter();
-  });
+  function observeEcwid() {
+    const observer = new MutationObserver(() => {
+      initWithRetry();
+    });
 
-  function start() {
     observer.observe(document.body, {
       childList: true,
       subtree: true
     });
+  }
 
-    initCityFilter();
+  function start() {
+    attachDelegatedListener();
+    observeEcwid();
+    initWithRetry();
   }
 
   if (document.readyState === "loading") {
