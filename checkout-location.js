@@ -1,177 +1,150 @@
-<script>
+Код Григорія, не працює перший раз, далі ідеально
+
 (function () {
-  // -----------------------------
-  // 1) CLUB LOCATION DATA
-  // -----------------------------
-  const clubLocations = {
-    CA: ["San Francisco Club", "Los Angeles Club", "San Diego Club"],
-    NY: ["Manhattan Club", "Brooklyn Club", "Albany Club"],
-    TX: ["Houston Club", "Dallas Club", "Austin Club"]
+  const STATE_FIELD_LABEL = "Choose State";
+  const CITY_FIELD_LABEL = "Choose City";
+
+  const CITY_MAP = {
+    "California": ["Los Angeles", "San Diego", "San Jose", "Sacramento"],
+    "Texas": ["Houston", "Dallas", "Austin", "San Antonio"],
+    "Florida": ["Miami", "Orlando", "Tampa", "Jacksonville"],
+    "New York": ["New York", "Buffalo", "Albany", "Rochester"]
   };
 
-  const STATE_KEY = "club_state";
-  const CITY_KEY = "club_city";
-
-  const STATE_TITLE = "Club State";
-  const CITY_TITLE = "Club Address";
-
-  // More reliable than trying to force into address internals
-  const DISPLAY_SECTION = "shipping_address";
-  const ORDER_DETAILS_SECTION = "customer_info";
-
-  let selectedState = "";
-  let selectedCity = "";
-
-  function initEcwidObjects() {
-    window.ec = window.ec || {};
-    ec.order = ec.order || {};
-    ec.order.extraFields = ec.order.extraFields || {};
+  function normalize(value) {
+    return (value || "").replace(/\s+/g, " ").trim().toLowerCase();
   }
 
-  function getStateOptions() {
-    return Object.keys(clubLocations).map(function (state) {
-      return {
-        title: state,
-        value: state
-      };
-    });
+  function isCheckoutPage() {
+    return !!document.querySelector(".ec-cart") || !!document.querySelector(".ec-checkout");
   }
 
-  function getCityOptions(state) {
-    const cities = clubLocations[state] || [];
+  function findSelectByLabelText(labelText) {
+    const wanted = normalize(labelText);
+    const nodes = Array.from(document.querySelectorAll("label, div, span"));
 
-    if (!cities.length) {
-      return [
-        {
-          title: "Select state first",
-          value: ""
+    for (const node of nodes) {
+      if (normalize(node.textContent) !== wanted) continue;
+
+      let current = node;
+      for (let i = 0; i < 5 && current; i += 1) {
+        const selects = current.querySelectorAll("select");
+        if (selects.length === 1) return selects[0];
+
+        if (selects.length > 1) {
+          for (const select of selects) {
+            const relation = node.compareDocumentPosition(select);
+            if (relation & Node.DOCUMENT_POSITION_FOLLOWING) {
+              return select;
+            }
+          }
+          return selects[0];
         }
-      ];
-    }
 
-    return cities.map(function (city) {
-      return {
-        title: city,
-        value: city
-      };
-    });
-  }
-
-  function buildFields() {
-    initEcwidObjects();
-
-    ec.order.extraFields[STATE_KEY] = {
-      title: STATE_TITLE,
-      type: "select",
-      required: true,
-      value: selectedState,
-      options: getStateOptions(),
-      checkoutDisplaySection: DISPLAY_SECTION,
-      orderDetailsDisplaySection: ORDER_DETAILS_SECTION
-    };
-
-    ec.order.extraFields[CITY_KEY] = {
-      title: CITY_TITLE,
-      type: "select",
-      required: true,
-      value: selectedCity,
-      options: getCityOptions(selectedState),
-      checkoutDisplaySection: DISPLAY_SECTION,
-      orderDetailsDisplaySection: ORDER_DETAILS_SECTION
-    };
-  }
-
-  function refreshFields() {
-    buildFields();
-    if (window.Ecwid && typeof Ecwid.refreshConfig === "function") {
-      Ecwid.refreshConfig();
-    }
-
-    // checkout DOM gets rerendered, so rebind after redraw
-    setTimeout(bindListeners, 500);
-    setTimeout(bindListeners, 1200);
-  }
-
-  function findSelectByFieldKey(fieldKey) {
-    const selectors = [
-      'select[name="' + fieldKey + '"]',
-      'select[name="extraFields.' + fieldKey + '"]',
-      '[data-extra-field-key="' + fieldKey + '"] select',
-      'select[id*="' + fieldKey + '"]'
-    ];
-
-    for (const selector of selectors) {
-      const el = document.querySelector(selector);
-      if (el) return el;
+        current = current.parentElement;
+      }
     }
 
     return null;
   }
 
-  function bindStateListener() {
-    const stateSelect = findSelectByFieldKey(STATE_KEY);
-    if (!stateSelect || stateSelect.dataset.clubBound === "1") return;
+  function isPlaceholder(option) {
+    const text = normalize(option.textContent);
+    return (
+      !option.value ||
+      text.includes("please choose") ||
+      text.includes("select") ||
+      text.includes("choose")
+    );
+  }
 
-    stateSelect.addEventListener("change", function (e) {
-      const newState = e.target.value || "";
+  function filterCityOptions(stateSelect, citySelect) {
+    const selectedStateValue = stateSelect.value;
+    const selectedStateText =
+      stateSelect.options[stateSelect.selectedIndex]?.textContent || "";
 
-      if (newState !== selectedState) {
-        selectedState = newState;
-        selectedCity = "";
-        refreshFields();
+    const stateKey = CITY_MAP[selectedStateValue]
+      ? selectedStateValue
+      : normalize(selectedStateText);
+
+    // Шукаємо ключ без normalize теж
+    const resolvedKey = CITY_MAP[selectedStateValue]
+      ? selectedStateValue
+      : Object.keys(CITY_MAP).find(k => normalize(k) === normalize(selectedStateText));
+
+    console.log(`Filtering cities for state: ${resolvedKey}`);
+
+    const allowedCities = resolvedKey && CITY_MAP[resolvedKey]
+      ? CITY_MAP[resolvedKey].map(normalize)
+      : null;
+
+    let firstVisible = null;
+
+    Array.from(citySelect.options).forEach(option => {
+      if (isPlaceholder(option)) {
+        option.style.display = "";
+        return;
+      }
+
+      const cityText = normalize(option.textContent);
+
+      if (!allowedCities || allowedCities.includes(cityText)) {
+        option.style.display = "";
+        if (!firstVisible) firstVisible = option;
+      } else {
+        option.style.display = "none";
       }
     });
 
-    stateSelect.dataset.clubBound = "1";
+    // Якщо поточний вибір захований — переключаємо на перший видимий
+    const currentOption = citySelect.options[citySelect.selectedIndex];
+    if (currentOption && currentOption.style.display === "none") {
+      citySelect.value = firstVisible ? firstVisible.value : "";
+      citySelect.dispatchEvent(new Event("change", { bubbles: true }));
+    }
   }
 
-  function bindCityListener() {
-    const citySelect = findSelectByFieldKey(CITY_KEY);
-    if (!citySelect || citySelect.dataset.clubBound === "1") return;
+  function initCityFilter() {
+    if (!isCheckoutPage()) return;
 
-    citySelect.addEventListener("change", function (e) {
-      selectedCity = e.target.value || "";
-      buildFields();
+    const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
+    const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
 
-      if (window.Ecwid && typeof Ecwid.refreshConfig === "function") {
-        Ecwid.refreshConfig();
-      }
+    if (!stateSelect || !citySelect) {
+      console.log("State or City field not found!");
+      return;
+    }
+
+    console.log("State and City fields found.");
+
+    if (citySelect.dataset.cityFilterInitialized === "1") return;
+    citySelect.dataset.cityFilterInitialized = "1";
+
+    stateSelect.addEventListener("change", function () {
+      filterCityOptions(stateSelect, citySelect);
     });
 
-    citySelect.dataset.clubBound = "1";
+    filterCityOptions(stateSelect, citySelect);
+
+    console.log("City filter initialized");
   }
 
-  function bindListeners() {
-    bindStateListener();
-    bindCityListener();
-  }
+  const observer = new MutationObserver(function () {
+    initCityFilter();
+  });
 
-  function run() {
-    refreshFields();
-
-    const observer = new MutationObserver(function () {
-      bindListeners();
-    });
-
+  function start() {
     observer.observe(document.body, {
       childList: true,
       subtree: true
     });
+
+    initCityFilter();
   }
 
-  if (window.Ecwid && Ecwid.OnPageLoaded && Ecwid.OnPageLoaded.add) {
-    Ecwid.OnPageLoaded.add(function (page) {
-      if (
-        page.type === "CHECKOUT_ADDRESS" ||
-        page.type === "CHECKOUT_DELIVERY" ||
-        page.type === "CHECKOUT_PAYMENT"
-      ) {
-        run();
-      }
-    });
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", start);
   } else {
-    // fallback
-    document.addEventListener("DOMContentLoaded", run);
+    start();
   }
 })();
-</script>
