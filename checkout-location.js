@@ -65,8 +65,8 @@
       options: buildStateOptions(),
       value: selectedState || "",
       required: true,
-      checkoutDisplaySection: "shipping_address",
-      orderDetailsDisplaySection: "shipping_info",
+      checkoutDisplaySection: "delivery_options",
+      orderDetailsDisplaySection: "delivery_options",
       showInNotifications: true
     };
 
