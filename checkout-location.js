@@ -9,37 +9,43 @@
     "New York": ["New York", "Buffalo", "Albany", "Rochester"]
   };
 
+  const CHECKOUT_PAGE_TYPES = new Set([
+    "CART",
+    "CHECKOUT_ADDRESS",
+    "CHECKOUT_DELIVERY",
+    "CHECKOUT_ADDRESS_BOOK",
+    "CHECKOUT_PAYMENT_DETAILS"
+  ]);
+
+  let initInterval = null;
+  let lastBoundStateSelect = null;
+  let lastBoundCitySelect = null;
+
   function normalize(value) {
     return (value || "").replace(/\s+/g, " ").trim().toLowerCase();
   }
 
-  function isCheckoutPage() {
-    return !!document.querySelector(".ec-cart") || !!document.querySelector(".ec-checkout");
+  function isCheckoutPageByDom() {
+    return !!document.querySelector(".ec-cart, .ec-checkout, .ec-store, .ecwid");
+  }
+
+  function labelMatches(nodeText, expectedText) {
+    const actual = normalize(nodeText);
+    const expected = normalize(expectedText);
+    return actual === expected || actual.includes(expected);
   }
 
   function findSelectByLabelText(labelText) {
-    const wanted = normalize(labelText);
-    const nodes = Array.from(document.querySelectorAll("label, div, span"));
+    const candidates = Array.from(document.querySelectorAll("label, div, span"));
 
-    for (const node of nodes) {
-      if (normalize(node.textContent) !== wanted) continue;
+    for (const node of candidates) {
+      if (!labelMatches(node.textContent, labelText)) continue;
 
       let current = node;
-      for (let i = 0; i < 6 && current; i += 1) {
+      for (let i = 0; i < 7 && current; i += 1) {
         const selects = current.querySelectorAll("select");
-
         if (selects.length === 1) return selects[0];
-
-        if (selects.length > 1) {
-          for (const select of selects) {
-            const relation = node.compareDocumentPosition(select);
-            if (relation & Node.DOCUMENT_POSITION_FOLLOWING) {
-              return select;
-            }
-          }
-          return selects[0];
-        }
-
+        if (selects.length > 1) return selects[0];
         current = current.parentElement;
       }
     }
@@ -47,145 +53,232 @@
     return null;
   }
 
-  function isPlaceholder(option) {
-    const text = normalize(option.textContent);
+  function isPlaceholderOptionData(optionLike) {
+    const text = normalize(optionLike.text || optionLike.textContent || "");
+    const value = optionLike.value || "";
     return (
-      !option.value ||
-      text.includes("please choose") ||
+      !value ||
+      text.includes("choose") ||
       text.includes("select") ||
-      text.includes("choose")
+      text.includes("please choose")
     );
   }
 
   function getResolvedStateKey(stateSelect) {
-    const selectedValue = stateSelect.value;
-    const selectedText = stateSelect.options[stateSelect.selectedIndex]?.textContent || "";
+    if (!stateSelect) return null;
+
+    const selectedValue = stateSelect.value || "";
+    const selectedText =
+      stateSelect.options[stateSelect.selectedIndex]?.textContent || "";
 
     if (CITY_MAP[selectedValue]) return selectedValue;
 
     return Object.keys(CITY_MAP).find(
-      key => normalize(key) === normalize(selectedText)
-    );
+      key =>
+        normalize(key) === normalize(selectedValue) ||
+        normalize(key) === normalize(selectedText)
+    ) || null;
   }
 
-  function resetCityOptions(citySelect) {
-    Array.from(citySelect.options).forEach(option => {
-      option.hidden = false;
-      option.disabled = false;
-      option.style.display = "";
-    });
+  function cacheOriginalCityOptions(citySelect) {
+    if (!citySelect) return [];
+
+    if (!citySelect._originalCityOptions || !citySelect._originalCityOptions.length) {
+      citySelect._originalCityOptions = Array.from(citySelect.options).map(option => ({
+        value: option.value,
+        text: option.textContent,
+        selected: option.selected
+      }));
+    }
+
+    return citySelect._originalCityOptions;
   }
 
-  function filterCityOptions(stateSelect, citySelect) {
-    const resolvedKey = getResolvedStateKey(stateSelect);
+  function rebuildCityOptions(stateSelect, citySelect) {
+    const originalOptions = cacheOriginalCityOptions(citySelect);
+    if (!originalOptions.length) return;
 
-    const allowedCities = resolvedKey
-      ? CITY_MAP[resolvedKey].map(normalize)
+    const currentValue = citySelect.value;
+    const resolvedStateKey = getResolvedStateKey(stateSelect);
+
+    const allowedCities = resolvedStateKey
+      ? new Set(CITY_MAP[resolvedStateKey].map(normalize))
       : null;
 
-    let firstVisibleValue = "";
-
-    Array.from(citySelect.options).forEach(option => {
-      if (isPlaceholder(option)) {
-        option.hidden = false;
-        option.disabled = false;
-        option.style.display = "";
-        return;
-      }
-
-      const cityText = normalize(option.textContent);
-      const allowed = !allowedCities || allowedCities.includes(cityText);
-
-      option.hidden = !allowed;
-      option.disabled = !allowed;
-      option.style.display = allowed ? "" : "none";
-
-      if (allowed && !firstVisibleValue) {
-        firstVisibleValue = option.value;
-      }
+    const filteredOptions = originalOptions.filter(option => {
+      if (isPlaceholderOptionData(option)) return true;
+      if (!allowedCities) return true;
+      return allowedCities.has(normalize(option.text));
     });
 
-    const currentOption = citySelect.options[citySelect.selectedIndex];
-    const currentInvalid =
-      currentOption &&
-      !isPlaceholder(currentOption) &&
-      (currentOption.hidden || currentOption.disabled || currentOption.style.display === "none");
+    citySelect.innerHTML = "";
 
-    if (currentInvalid) {
-      citySelect.value = firstVisibleValue || "";
-      citySelect.dispatchEvent(new Event("change", { bubbles: true }));
+    filteredOptions.forEach(optionData => {
+      const option = document.createElement("option");
+      option.value = optionData.value;
+      option.textContent = optionData.text;
+      citySelect.appendChild(option);
+    });
+
+    const hasPreviousValue = filteredOptions.some(opt => opt.value === currentValue);
+    const firstRealOption = filteredOptions.find(opt => !isPlaceholderOptionData(opt));
+    const placeholderOption = filteredOptions.find(opt => isPlaceholderOptionData(opt));
+
+    if (hasPreviousValue) {
+      citySelect.value = currentValue;
+    } else if (placeholderOption) {
+      citySelect.value = placeholderOption.value;
+    } else if (firstRealOption) {
+      citySelect.value = firstRealOption.value;
+    } else {
+      citySelect.value = "";
     }
+
+    citySelect.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
-  function areFieldsReady(stateSelect, citySelect) {
+  function fieldsAreReady(stateSelect, citySelect) {
     if (!stateSelect || !citySelect) return false;
-    if (stateSelect.options.length < 2) return false;
-    if (citySelect.options.length < 1) return false;
+    if (!stateSelect.options || stateSelect.options.length < 2) return false;
+    if (!citySelect.options || citySelect.options.length < 1) return false;
     return true;
   }
 
   function bindFilter(stateSelect, citySelect) {
-    const stateKey = stateSelect;
-    const cityKey = citySelect;
-
     if (
-      stateKey.dataset.cityFilterBound === "1" &&
-      cityKey.dataset.cityFilterBound === "1"
+      lastBoundStateSelect === stateSelect &&
+      lastBoundCitySelect === citySelect
     ) {
+      rebuildCityOptions(stateSelect, citySelect);
       return;
     }
 
-    stateKey.dataset.cityFilterBound = "1";
-    cityKey.dataset.cityFilterBound = "1";
+    if (lastBoundStateSelect && lastBoundStateSelect._cityFilterHandler) {
+      lastBoundStateSelect.removeEventListener(
+        "change",
+        lastBoundStateSelect._cityFilterHandler
+      );
+    }
 
-    stateSelect.addEventListener("change", function () {
-      filterCityOptions(stateSelect, citySelect);
-    });
+    const handler = function () {
+      rebuildCityOptions(stateSelect, citySelect);
+    };
 
-    filterCityOptions(stateSelect, citySelect);
+    stateSelect.addEventListener("change", handler);
+    stateSelect._cityFilterHandler = handler;
 
-    console.log("City filter initialized");
+    lastBoundStateSelect = stateSelect;
+    lastBoundCitySelect = citySelect;
+
+    rebuildCityOptions(stateSelect, citySelect);
+    console.log("Ecwid city filter bound");
   }
 
-  function initCityFilter() {
-    if (!isCheckoutPage()) return;
+  function tryInit() {
+    if (!isCheckoutPageByDom()) return false;
 
     const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
     const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
 
     if (!stateSelect || !citySelect) {
-      console.log("State or City field not found yet");
-      return;
+      console.log("State or City select not found yet");
+      return false;
     }
 
-    if (!areFieldsReady(stateSelect, citySelect)) {
-      console.log("Fields found but not ready yet");
-      return;
+    if (!fieldsAreReady(stateSelect, citySelect)) {
+      console.log("State or City select found, but not ready yet");
+      return false;
     }
 
-    resetCityOptions(citySelect);
     bindFilter(stateSelect, citySelect);
-    filterCityOptions(stateSelect, citySelect);
+    return true;
   }
 
-  const observer = new MutationObserver(() => {
-    initCityFilter();
-  });
+  function startInitAttempts() {
+    if (initInterval) {
+      clearInterval(initInterval);
+      initInterval = null;
+    }
+
+    let attempts = 0;
+    const maxAttempts = 40;
+
+    const run = function () {
+      attempts += 1;
+
+      const ready = tryInit();
+      if (ready || attempts >= maxAttempts) {
+        clearInterval(initInterval);
+        initInterval = null;
+      }
+    };
+
+    run();
+    initInterval = setInterval(run, 250);
+
+    setTimeout(run, 300);
+    setTimeout(run, 700);
+    setTimeout(run, 1200);
+    setTimeout(run, 2000);
+    setTimeout(run, 3000);
+  }
+
+  function onEcwidPageLoaded(page) {
+    if (!page || !page.type) {
+      startInitAttempts();
+      return;
+    }
+
+    if (CHECKOUT_PAGE_TYPES.has(page.type)) {
+      startInitAttempts();
+    }
+  }
+
+  function connectEcwidEvents() {
+    if (
+      window.Ecwid &&
+      Ecwid.OnPageLoaded &&
+      typeof Ecwid.OnPageLoaded.add === "function"
+    ) {
+      Ecwid.OnPageLoaded.add(onEcwidPageLoaded);
+      startInitAttempts();
+      return true;
+    }
+
+    return false;
+  }
 
   function start() {
-    if (!document.body) return;
+    if (!connectEcwidEvents()) {
+      let tries = 0;
+      const waitEcwid = setInterval(function () {
+        tries += 1;
+        if (connectEcwidEvents() || tries > 40) {
+          clearInterval(waitEcwid);
+          startInitAttempts();
+        }
+      }, 250);
+    }
 
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
+    const observer = new MutationObserver(function () {
+      if (
+        !lastBoundStateSelect ||
+        !document.contains(lastBoundStateSelect) ||
+        !lastBoundCitySelect ||
+        !document.contains(lastBoundCitySelect)
+      ) {
+        startInitAttempts();
+      }
     });
 
-    initCityFilter();
+    if (document.body) {
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true
+      });
+    }
 
-    setTimeout(initCityFilter, 300);
-    setTimeout(initCityFilter, 800);
-    setTimeout(initCityFilter, 1500);
-    setTimeout(initCityFilter, 2500);
+    startInitAttempts();
   }
 
   if (document.readyState === "loading") {
@@ -194,8 +287,5 @@
     start();
   }
 
-  window.addEventListener("load", function () {
-    initCityFilter();
-    setTimeout(initCityFilter, 500);
-  });
+  window.addEventListener("load", startInitAttempts);
 })();
