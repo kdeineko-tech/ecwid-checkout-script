@@ -16,7 +16,7 @@
   const CITY_TITLE = "Club Address";
 
   // More reliable than trying to force into address internals
-  const DISPLAY_SECTION = "payment_details";
+  const DISPLAY_SECTION = "shipping_address";
   const ORDER_DETAILS_SECTION = "customer_info";
 
   let selectedState = "";
