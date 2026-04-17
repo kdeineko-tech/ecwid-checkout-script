@@ -9,8 +9,44 @@
     "New York": ["New York", "Buffalo", "Albany", "Rochester"]
   };
 
+  let boundStateSelect = null;
+  let boundCitySelect = null;
+  let boundHandler = null;
+  let stabilityTimer = null;
+  let observer = null;
+
   function normalize(value) {
     return (value || "").replace(/\s+/g, " ").trim().toLowerCase();
+  }
+
+  function isVisible(el) {
+    if (!el || !document.contains(el)) return false;
+    const style = window.getComputedStyle(el);
+    if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
+      return false;
+    }
+    if (el.offsetParent === null && style.position !== "fixed") {
+      return false;
+    }
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }
+
+  function isCheckoutPage() {
+    return !!document.querySelector(".ec-cart, .ec-checkout, .ec-store, .ecwid");
+  }
+
+  function findVisibleSelectNearNode(node) {
+    let current = node;
+
+    for (let i = 0; i < 7 && current; i += 1) {
+      const selects = Array.from(current.querySelectorAll("select")).filter(isVisible);
+      if (selects.length === 1) return selects[0];
+      if (selects.length > 1) return selects[0];
+      current = current.parentElement;
+    }
+
+    return null;
   }
 
   function findSelectByLabelText(labelText) {
@@ -18,26 +54,11 @@
     const nodes = Array.from(document.querySelectorAll("label, div, span"));
 
     for (const node of nodes) {
-      if (normalize(node.textContent) !== wanted) continue;
+      const text = normalize(node.textContent);
+      if (text !== wanted && !text.includes(wanted)) continue;
 
-      let current = node;
-      for (let i = 0; i < 5 && current; i += 1) {
-        const selects = current.querySelectorAll("select");
-
-        if (selects.length === 1) return selects[0];
-
-        if (selects.length > 1) {
-          for (const select of selects) {
-            const relation = node.compareDocumentPosition(select);
-            if (relation & Node.DOCUMENT_POSITION_FOLLOWING) {
-              return select;
-            }
-          }
-          return selects[0];
-        }
-
-        current = current.parentElement;
-      }
+      const select = findVisibleSelectNearNode(node);
+      if (select) return select;
     }
 
     return null;
@@ -53,18 +74,20 @@
     );
   }
 
-  function filterCityOptions(stateSelect, citySelect) {
+  function resolveStateKey(stateSelect) {
     const selectedStateValue = stateSelect.value;
     const selectedStateText =
       stateSelect.options[stateSelect.selectedIndex]?.textContent || "";
 
-    const resolvedKey = CITY_MAP[selectedStateValue]
-      ? selectedStateValue
-      : Object.keys(CITY_MAP).find(
-          k => normalize(k) === normalize(selectedStateText)
-        );
+    if (CITY_MAP[selectedStateValue]) return selectedStateValue;
 
-    console.log("Filtering cities for state:", resolvedKey);
+    return Object.keys(CITY_MAP).find(
+      key => normalize(key) === normalize(selectedStateText)
+    ) || null;
+  }
+
+  function filterCityOptions(stateSelect, citySelect) {
+    const resolvedKey = resolveStateKey(stateSelect);
 
     const allowedCities = resolvedKey && CITY_MAP[resolvedKey]
       ? CITY_MAP[resolvedKey].map(normalize)
@@ -74,144 +97,209 @@
 
     Array.from(citySelect.options).forEach(option => {
       if (isPlaceholder(option)) {
-        option.style.display = "";
         option.hidden = false;
         option.disabled = false;
+        option.style.display = "";
         return;
       }
 
       const cityText = normalize(option.textContent);
+      const allowed = !allowedCities || allowedCities.includes(cityText);
 
-      if (!allowedCities || allowedCities.includes(cityText)) {
-        option.style.display = "";
-        option.hidden = false;
-        option.disabled = false;
-        if (!firstVisible) firstVisible = option;
-      } else {
-        option.style.display = "none";
-        option.hidden = true;
-        option.disabled = true;
+      option.hidden = !allowed;
+      option.disabled = !allowed;
+      option.style.display = allowed ? "" : "none";
+
+      if (allowed && !firstVisible) {
+        firstVisible = option;
       }
     });
 
     const currentOption = citySelect.options[citySelect.selectedIndex];
-    if (
+    const currentInvalid =
       currentOption &&
-      (currentOption.style.display === "none" || currentOption.hidden || currentOption.disabled)
-    ) {
+      !isPlaceholder(currentOption) &&
+      (currentOption.hidden || currentOption.disabled || currentOption.style.display === "none");
+
+    if (currentInvalid) {
       citySelect.value = firstVisible ? firstVisible.value : "";
       citySelect.dispatchEvent(new Event("change", { bubbles: true }));
     }
   }
 
-  function initCityFilter() {
-    const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
-    const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
+  function fieldsReady(stateSelect, citySelect) {
+    if (!stateSelect || !citySelect) return false;
+    if (!isVisible(stateSelect) || !isVisible(citySelect)) return false;
+    if (!stateSelect.options || stateSelect.options.length < 2) return false;
+    if (!citySelect.options || citySelect.options.length < 1) return false;
+    return true;
+  }
 
-    if (!stateSelect || !citySelect) {
-      console.log("State or City field not found yet");
-      return false;
+  function unbindPrevious() {
+    if (boundStateSelect && boundHandler) {
+      boundStateSelect.removeEventListener("change", boundHandler);
     }
+    boundStateSelect = null;
+    boundCitySelect = null;
+    boundHandler = null;
+  }
 
-    if (stateSelect.options.length < 2 || citySelect.options.length < 1) {
-      console.log("Fields found but options are not ready yet");
-      return false;
-    }
+  function bindFilter(stateSelect, citySelect) {
+    const sameBinding =
+      boundStateSelect === stateSelect &&
+      boundCitySelect === citySelect &&
+      boundHandler;
 
-    if (
-      stateSelect.dataset.cityFilterBound === "1" &&
-      citySelect.dataset.cityFilterBound === "1"
-    ) {
+    if (sameBinding) {
       filterCityOptions(stateSelect, citySelect);
       return true;
     }
 
-    stateSelect.dataset.cityFilterBound = "1";
-    citySelect.dataset.cityFilterBound = "1";
+    unbindPrevious();
 
-    stateSelect.addEventListener("change", function () {
+    boundHandler = function () {
       filterCityOptions(stateSelect, citySelect);
-    });
+    };
 
+    boundStateSelect = stateSelect;
+    boundCitySelect = citySelect;
+
+    stateSelect.addEventListener("change", boundHandler);
     filterCityOptions(stateSelect, citySelect);
 
-    console.log("City filter initialized");
+    console.log("City filter bound to current checkout fields");
     return true;
   }
 
-  function runInitAttempts() {
+  function initWhenStable() {
+    if (!isCheckoutPage()) return;
+
+    let lastState = null;
+    let lastCity = null;
+    let lastStateOptions = -1;
+    let lastCityOptions = -1;
+    let stableHits = 0;
     let tries = 0;
-    const maxTries = 25;
+    const maxTries = 40;
 
-    const timer = setInterval(function () {
+    if (stabilityTimer) {
+      clearInterval(stabilityTimer);
+      stabilityTimer = null;
+    }
+
+    stabilityTimer = setInterval(function () {
       tries += 1;
-      const success = initCityFilter();
 
-      if (success || tries >= maxTries) {
-        clearInterval(timer);
+      const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
+      const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
+
+      if (!fieldsReady(stateSelect, citySelect)) {
+        stableHits = 0;
+        if (tries >= maxTries) clearInterval(stabilityTimer);
+        return;
       }
-    }, 300);
 
-    setTimeout(initCityFilter, 200);
-    setTimeout(initCityFilter, 600);
-    setTimeout(initCityFilter, 1200);
-    setTimeout(initCityFilter, 2000);
+      const sameRefs = stateSelect === lastState && citySelect === lastCity;
+      const sameCounts =
+        stateSelect.options.length === lastStateOptions &&
+        citySelect.options.length === lastCityOptions;
+
+      if (sameRefs && sameCounts) {
+        stableHits += 1;
+      } else {
+        stableHits = 0;
+      }
+
+      lastState = stateSelect;
+      lastCity = citySelect;
+      lastStateOptions = stateSelect.options.length;
+      lastCityOptions = citySelect.options.length;
+
+      if (stableHits >= 2) {
+        bindFilter(stateSelect, citySelect);
+        clearInterval(stabilityTimer);
+        stabilityTimer = null;
+      }
+
+      if (tries >= maxTries) {
+        bindFilter(stateSelect, citySelect);
+        clearInterval(stabilityTimer);
+        stabilityTimer = null;
+      }
+    }, 250);
   }
 
-  function startWithEcwid() {
-    if (
-      window.Ecwid &&
-      Ecwid.OnAPILoaded &&
-      typeof Ecwid.OnAPILoaded.add === "function"
-    ) {
-      Ecwid.OnAPILoaded.add(function () {
-        if (
-          Ecwid.OnPageLoaded &&
-          typeof Ecwid.OnPageLoaded.add === "function"
-        ) {
-          Ecwid.OnPageLoaded.add(function (page) {
-            const checkoutPages = [
-              "CART",
-              "CHECKOUT_ADDRESS",
-              "CHECKOUT_DELIVERY",
-              "CHECKOUT_PAYMENT_DETAILS",
-              "CHECKOUT_ADDRESS_BOOK"
-            ];
+  function startObserver() {
+    if (observer) return;
 
-            if (!page || checkoutPages.includes(page.type)) {
-              runInitAttempts();
-            }
-          });
-        }
+    observer = new MutationObserver(function () {
+      const stateGone = boundStateSelect && !document.contains(boundStateSelect);
+      const cityGone = boundCitySelect && !document.contains(boundCitySelect);
 
-        runInitAttempts();
+      if (!boundStateSelect || !boundCitySelect || stateGone || cityGone) {
+        initWhenStable();
+      }
+    });
+
+    if (document.body) {
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true
       });
-    } else {
-      // fallback, якщо Ecwid API ще не готовий
-      let waitCount = 0;
-      const waitTimer = setInterval(function () {
-        waitCount += 1;
-
-        if (
-          window.Ecwid &&
-          Ecwid.OnAPILoaded &&
-          typeof Ecwid.OnAPILoaded.add === "function"
-        ) {
-          clearInterval(waitTimer);
-          startWithEcwid();
-        }
-
-        if (waitCount >= 40) {
-          clearInterval(waitTimer);
-          runInitAttempts();
-        }
-      }, 250);
     }
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", startWithEcwid);
-  } else {
-    startWithEcwid();
+  function start() {
+    startObserver();
+    initWhenStable();
+
+    setTimeout(initWhenStable, 300);
+    setTimeout(initWhenStable, 800);
+    setTimeout(initWhenStable, 1500);
+    setTimeout(initWhenStable, 2500);
   }
+
+  function startWithEcwidHooks() {
+    if (
+      window.Ecwid &&
+      Ecwid.OnPageLoaded &&
+      typeof Ecwid.OnPageLoaded.add === "function"
+    ) {
+      Ecwid.OnPageLoaded.add(function () {
+        start();
+      });
+      start();
+      return;
+    }
+
+    let waitCount = 0;
+    const waitTimer = setInterval(function () {
+      waitCount += 1;
+
+      if (
+        window.Ecwid &&
+        Ecwid.OnPageLoaded &&
+        typeof Ecwid.OnPageLoaded.add === "function"
+      ) {
+        clearInterval(waitTimer);
+        Ecwid.OnPageLoaded.add(function () {
+          start();
+        });
+        start();
+      }
+
+      if (waitCount >= 40) {
+        clearInterval(waitTimer);
+        start();
+      }
+    }, 250);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", startWithEcwidHooks);
+  } else {
+    startWithEcwidHooks();
+  }
+
+  window.addEventListener("load", start);
 })();
