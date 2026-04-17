@@ -10,7 +10,10 @@
   };
 
   function normalize(value) {
-    return (value || "").replace(/\s+/g, " ").trim().toLowerCase();
+    return (value || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
   }
 
   function isCheckoutPage() {
@@ -31,6 +34,7 @@
         current = current.parentElement;
       }
     }
+
     return null;
   }
 
@@ -87,24 +91,32 @@
     }
   }
 
-  // 🧠 SINGLE GLOBAL HANDLER (no duplicates ever)
-  function attachDelegatedListener() {
-    if (window.__ecwidCityFilterAttached) return;
-    window.__ecwidCityFilterAttached = true;
+  // 🔥 DEFAULT STATE LOGIC
+  function applyDefaultState(stateSelect, citySelect) {
+    if (!stateSelect || !citySelect) return;
 
-    document.addEventListener("change", function (e) {
-      const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
-      const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
+    // якщо вже вибрано — не чіпаємо
+    if (stateSelect.value) return;
 
-      if (!stateSelect || !citySelect) return;
-      if (e.target !== stateSelect) return;
+    const firstValid = Array.from(stateSelect.options)
+      .find(o =>
+        o.value &&
+        !normalize(o.textContent).includes("select")
+      );
 
-      filterCityOptions(stateSelect, citySelect);
-    });
+    if (!firstValid) return;
+
+    stateSelect.value = firstValid.value;
+
+    stateSelect.dispatchEvent(
+      new Event("change", { bubbles: true })
+    );
+
+    filterCityOptions(stateSelect, citySelect);
   }
 
-  // 🔁 retry until Ecwid renders fields
-  function initWithRetry(retries = 20) {
+  // 🧠 retry until Ecwid renders fields
+  function init(retries = 25) {
     if (!isCheckoutPage()) return;
 
     const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
@@ -112,29 +124,47 @@
 
     if (!stateSelect || !citySelect) {
       if (retries > 0) {
-        setTimeout(() => initWithRetry(retries - 1), 300);
+        setTimeout(() => init(retries - 1), 300);
       }
       return;
     }
 
-    filterCityOptions(stateSelect, citySelect);
+    // first: apply default
+    applyDefaultState(stateSelect, citySelect);
+
+    // then ensure filtering
+    setTimeout(() => {
+      filterCityOptions(stateSelect, citySelect);
+    }, 200);
+
+    // attach change listener (safe even if Ecwid rerenders select)
+    if (!window.__ecwidCityFilterBound) {
+      window.__ecwidCityFilterBound = true;
+
+      document.addEventListener("change", function (e) {
+        const s = findSelectByLabelText(STATE_FIELD_LABEL);
+        const c = findSelectByLabelText(CITY_FIELD_LABEL);
+
+        if (!s || !c) return;
+        if (e.target !== s) return;
+
+        filterCityOptions(s, c);
+      });
+    }
   }
 
-  function observeEcwid() {
-    const observer = new MutationObserver(() => {
-      initWithRetry();
-    });
+  // 👀 observe Ecwid rerenders
+  const observer = new MutationObserver(() => {
+    init();
+  });
 
+  function start() {
     observer.observe(document.body, {
       childList: true,
       subtree: true
     });
-  }
 
-  function start() {
-    attachDelegatedListener();
-    observeEcwid();
-    initWithRetry();
+    init();
   }
 
   if (document.readyState === "loading") {
