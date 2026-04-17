@@ -1,58 +1,49 @@
 <script>
 (function () {
-  // ------------------------------
-  // 1) DATA: state -> cities
-  // Replace this with your real data
-  // ------------------------------
-  const locationData = {
-    CA: ["San Francisco", "Los Angeles", "San Diego"],
-    NY: ["Manhattan", "Brooklyn", "Albany"],
-    TX: ["Houston", "Dallas", "Austin"]
+  // -----------------------------
+  // 1) CLUB LOCATION DATA
+  // -----------------------------
+  const clubLocations = {
+    CA: ["San Francisco Club", "Los Angeles Club", "San Diego Club"],
+    NY: ["Manhattan Club", "Brooklyn Club", "Albany Club"],
+    TX: ["Houston Club", "Dallas Club", "Austin Club"]
   };
 
-  // ------------------------------
-  // 2) CONFIG
-  // ------------------------------
-  const STATE_FIELD_KEY = "delivery_state";
-  const CITY_FIELD_KEY = "delivery_city";
+  const STATE_KEY = "club_state";
+  const CITY_KEY = "club_city";
 
-  const STATE_FIELD_TITLE = "State";
-  const CITY_FIELD_TITLE = "City";
+  const STATE_TITLE = "Club State";
+  const CITY_TITLE = "Club Address";
 
-  const CHECKOUT_SECTION = "shipping_methods"; // Delivery options section
-  const ORDER_DETAILS_SECTION = "shipping_info";
+  // More reliable than trying to force into address internals
+  const DISPLAY_SECTION = "payment_details";
+  const ORDER_DETAILS_SECTION = "customer_info";
 
-  let currentState = "";
-  let currentCity = "";
-  let stateListenerAttached = false;
-  let cityListenerAttached = false;
+  let selectedState = "";
+  let selectedCity = "";
 
-  // ------------------------------
-  // 3) INIT EXTRA FIELDS STORAGE
-  // ------------------------------
-  window.ec = window.ec || {};
-  ec.order = ec.order || {};
-  ec.order.extraFields = ec.order.extraFields || {};
+  function initEcwidObjects() {
+    window.ec = window.ec || {};
+    ec.order = ec.order || {};
+    ec.order.extraFields = ec.order.extraFields || {};
+  }
 
-  // ------------------------------
-  // 4) HELPERS
-  // ------------------------------
   function getStateOptions() {
-    return Object.keys(locationData).map(function (stateCode) {
+    return Object.keys(clubLocations).map(function (state) {
       return {
-        title: stateCode,
-        value: stateCode
+        title: state,
+        value: state
       };
     });
   }
 
-  function getCityOptions(stateCode) {
-    const cities = locationData[stateCode] || [];
+  function getCityOptions(state) {
+    const cities = clubLocations[state] || [];
 
     if (!cities.length) {
       return [
         {
-          title: "Please select a state first",
+          title: "Select state first",
           value: ""
         }
       ];
@@ -66,58 +57,47 @@
     });
   }
 
-  function setHiddenFallbackValues() {
-    // Extra safeguard so current values stay in order.extraFields
-    ec.order.extraFields[STATE_FIELD_KEY] = {
-      title: STATE_FIELD_TITLE,
+  function buildFields() {
+    initEcwidObjects();
+
+    ec.order.extraFields[STATE_KEY] = {
+      title: STATE_TITLE,
       type: "select",
       required: true,
+      value: selectedState,
       options: getStateOptions(),
-      value: currentState,
-      checkoutDisplaySection: CHECKOUT_SECTION,
-      orderDetailsDisplaySection: ORDER_DETAILS_SECTION,
-      showInNotifications: true
+      checkoutDisplaySection: DISPLAY_SECTION,
+      orderDetailsDisplaySection: ORDER_DETAILS_SECTION
     };
 
-    ec.order.extraFields[CITY_FIELD_KEY] = {
-      title: CITY_FIELD_TITLE,
+    ec.order.extraFields[CITY_KEY] = {
+      title: CITY_TITLE,
       type: "select",
       required: true,
-      options: getCityOptions(currentState),
-      value: currentCity,
-      checkoutDisplaySection: CHECKOUT_SECTION,
-      orderDetailsDisplaySection: ORDER_DETAILS_SECTION,
-      showInNotifications: true
+      value: selectedCity,
+      options: getCityOptions(selectedState),
+      checkoutDisplaySection: DISPLAY_SECTION,
+      orderDetailsDisplaySection: ORDER_DETAILS_SECTION
     };
   }
 
-  function renderFields() {
-    setHiddenFallbackValues();
-
+  function refreshFields() {
+    buildFields();
     if (window.Ecwid && typeof Ecwid.refreshConfig === "function") {
       Ecwid.refreshConfig();
     }
 
-    // Ecwid re-renders checkout after refreshConfig,
-    // so listeners must be attached again.
-    stateListenerAttached = false;
-    cityListenerAttached = false;
-
-    setTimeout(bindListeners, 300);
-    setTimeout(bindListeners, 800);
+    // checkout DOM gets rerendered, so rebind after redraw
+    setTimeout(bindListeners, 500);
+    setTimeout(bindListeners, 1200);
   }
 
-  function normalizeValue(value) {
-    return (value || "").trim();
-  }
-
-  function findFieldSelect(fieldKey, titleText) {
+  function findSelectByFieldKey(fieldKey) {
     const selectors = [
-      `select[name="${fieldKey}"]`,
-      `select[name="extraFields.${fieldKey}"]`,
-      `[data-extra-field-key="${fieldKey}"] select`,
-      `[data-field-name="${fieldKey}"] select`,
-      `select[id*="${fieldKey}"]`
+      'select[name="' + fieldKey + '"]',
+      'select[name="extraFields.' + fieldKey + '"]',
+      '[data-extra-field-key="' + fieldKey + '"] select',
+      'select[id*="' + fieldKey + '"]'
     ];
 
     for (const selector of selectors) {
@@ -125,84 +105,73 @@
       if (el) return el;
     }
 
-    // Fallback: find a select by nearby label text
-    const labels = Array.from(document.querySelectorAll("label, div, span"));
-    const matchedLabel = labels.find(function (node) {
-      return normalizeValue(node.textContent) === normalizeValue(titleText);
-    });
-
-    if (matchedLabel) {
-      const wrapper = matchedLabel.closest("div");
-      if (wrapper) {
-        const select = wrapper.querySelector("select") || wrapper.parentElement?.querySelector("select");
-        if (select) return select;
-      }
-    }
-
     return null;
   }
 
-  function bindStateChange() {
-    if (stateListenerAttached) return;
-
-    const stateSelect = findFieldSelect(STATE_FIELD_KEY, STATE_FIELD_TITLE);
-    if (!stateSelect) return;
+  function bindStateListener() {
+    const stateSelect = findSelectByFieldKey(STATE_KEY);
+    if (!stateSelect || stateSelect.dataset.clubBound === "1") return;
 
     stateSelect.addEventListener("change", function (e) {
       const newState = e.target.value || "";
 
-      if (newState === currentState) return;
-
-      currentState = newState;
-      currentCity = ""; // reset city when state changes
-      renderFields();
+      if (newState !== selectedState) {
+        selectedState = newState;
+        selectedCity = "";
+        refreshFields();
+      }
     });
 
-    stateListenerAttached = true;
+    stateSelect.dataset.clubBound = "1";
   }
 
-  function bindCityChange() {
-    if (cityListenerAttached) return;
-
-    const citySelect = findFieldSelect(CITY_FIELD_KEY, CITY_FIELD_TITLE);
-    if (!citySelect) return;
+  function bindCityListener() {
+    const citySelect = findSelectByFieldKey(CITY_KEY);
+    if (!citySelect || citySelect.dataset.clubBound === "1") return;
 
     citySelect.addEventListener("change", function (e) {
-      currentCity = e.target.value || "";
-      setHiddenFallbackValues();
+      selectedCity = e.target.value || "";
+      buildFields();
 
       if (window.Ecwid && typeof Ecwid.refreshConfig === "function") {
         Ecwid.refreshConfig();
       }
     });
 
-    cityListenerAttached = true;
+    citySelect.dataset.clubBound = "1";
   }
 
   function bindListeners() {
-    bindStateChange();
-    bindCityChange();
+    bindStateListener();
+    bindCityListener();
   }
 
-  // ------------------------------
-  // 5) RUN ONLY ON DELIVERY STEP
-  // ------------------------------
+  function run() {
+    refreshFields();
+
+    const observer = new MutationObserver(function () {
+      bindListeners();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  }
+
   if (window.Ecwid && Ecwid.OnPageLoaded && Ecwid.OnPageLoaded.add) {
     Ecwid.OnPageLoaded.add(function (page) {
-      if (page.type === "CHECKOUT_DELIVERY") {
-        renderFields();
-
-        // Watch for Ecwid DOM re-renders on checkout
-        const observer = new MutationObserver(function () {
-          bindListeners();
-        });
-
-        observer.observe(document.body, {
-          childList: true,
-          subtree: true
-        });
+      if (
+        page.type === "CHECKOUT_ADDRESS" ||
+        page.type === "CHECKOUT_DELIVERY" ||
+        page.type === "CHECKOUT_PAYMENT"
+      ) {
+        run();
       }
     });
+  } else {
+    // fallback
+    document.addEventListener("DOMContentLoaded", run);
   }
 })();
 </script>
