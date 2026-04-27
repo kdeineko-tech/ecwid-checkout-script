@@ -1,5 +1,3 @@
-Код Григорія, не працює перший раз, далі ідеально
-
 (function () {
   const STATE_FIELD_LABEL = "Choose State";
   const CITY_FIELD_LABEL = "Choose City";
