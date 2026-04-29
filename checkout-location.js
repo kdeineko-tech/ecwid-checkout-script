@@ -5,6 +5,8 @@
   const CLUB_LOCATION_DESCRIPTION =
     "Support your local boot camp! Select your home location from the dropdown and they will earn a percentage from your sale.";
 
+  let lastInjectedTarget = null;
+
   const CITY_MAP = {
     "California": ["Los Angeles", "San Diego", "San Jose", "Sacramento"],
     "Texas": ["Houston", "Dallas", "Austin", "San Antonio"],
@@ -86,21 +88,17 @@
 
   function addClubLocationDescription() {
     const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
-    if (!stateSelect) return false;
+    if (!stateSelect) return;
 
     const labelNode = findFieldLabelNode(STATE_FIELD_LABEL, stateSelect);
-    if (!labelNode) return false;
+    if (!labelNode) return;
 
-    const fieldContainer =
-      stateSelect.closest(".ec-form__cell") ||
-      stateSelect.closest(".form-control") ||
-      labelNode.parentElement;
+    if (lastInjectedTarget === labelNode) return;
 
-    if (!fieldContainer) return false;
+    lastInjectedTarget = labelNode;
 
-    if (fieldContainer.querySelector(".club-location-description")) {
-      return true;
-    }
+    const existing = document.querySelector(".club-location-description");
+    if (existing) existing.remove();
 
     const description = document.createElement("div");
     description.className = "club-location-description";
@@ -114,7 +112,7 @@
 
     labelNode.insertAdjacentElement("beforebegin", description);
 
-    return true;
+    console.log("Club location description injected");
   }
 
   function filterCityOptions(stateSelect, citySelect) {
@@ -176,17 +174,6 @@
     filterCityOptions(stateSelect, citySelect);
   }
 
-  function scheduleApplyFieldEnhancements() {
-    requestAnimationFrame(function () {
-      applyFieldEnhancements();
-
-      setTimeout(applyFieldEnhancements, 100);
-      setTimeout(applyFieldEnhancements, 300);
-      setTimeout(applyFieldEnhancements, 700);
-      setTimeout(applyFieldEnhancements, 1200);
-    });
-  }
-
   function start() {
     document.body.addEventListener("change", function (event) {
       const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
@@ -198,7 +185,7 @@
     });
 
     const observer = new MutationObserver(function () {
-      scheduleApplyFieldEnhancements();
+      applyFieldEnhancements();
     });
 
     observer.observe(document.body, {
@@ -206,7 +193,7 @@
       subtree: true
     });
 
-    scheduleApplyFieldEnhancements();
+    applyFieldEnhancements();
   }
 
   if (document.readyState === "loading") {
