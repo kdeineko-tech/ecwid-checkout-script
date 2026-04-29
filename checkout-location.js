@@ -65,6 +65,7 @@
       ? selectedStateValue
       : normalize(selectedStateText);
 
+    // Шукаємо ключ без normalize теж
     const resolvedKey = CITY_MAP[selectedStateValue]
       ? selectedStateValue
       : Object.keys(CITY_MAP).find(k => normalize(k) === normalize(selectedStateText));
@@ -93,6 +94,7 @@
       }
     });
 
+    // Якщо поточний вибір захований — переключаємо на перший видимий
     const currentOption = citySelect.options[citySelect.selectedIndex];
     if (currentOption && currentOption.style.display === "none") {
       citySelect.value = firstVisible ? firstVisible.value : "";
@@ -100,39 +102,51 @@
     }
   }
 
+  function initCityFilter() {
+    if (!isCheckoutPage()) return;
+
+    const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
+    const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
+
+    if (!stateSelect || !citySelect) {
+      console.log("State or City field not found!");
+      return;
+    }
+
+    console.log("State and City fields found.");
+
+    if (citySelect.dataset.cityFilterInitialized === "1") return;
+    citySelect.dataset.cityFilterInitialized = "1";
+
+    function start() {
+// 1. Use Event Delegation on the body
+document.body.addEventListener("change", function (event) {
+// Check if the changed element is our State Select
+const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
+const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
+
+if (event.target === stateSelect && citySelect) { console.log("State change detected via delegation"); filterCityOptions(stateSelect, citySelect); }});
+
+// 2. Keep the observer only for triggering the INITIAL filter (if a state is pre-selected)const observer = new MutationObserver(function () { const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL); const citySelect = findSelectByLabelText(CITY_FIELD_LABEL); if (stateSelect && citySelect && citySelect.dataset.cityFilterInitialized !== "1") { citySelect.dataset.cityFilterInitialized = "1"; filterCityOptions(stateSelect, citySelect); console.log("Initial load filter applied"); }});
+
+observer.observe(document.body, { childList: true, subtree: true });}
+
+    filterCityOptions(stateSelect, citySelect);
+
+    console.log("City filter initialized");
+  }
+
+  const observer = new MutationObserver(function () {
+    initCityFilter();
+  });
+
   function start() {
-    // 1. Use Event Delegation on the body for state changes
-    document.body.addEventListener("change", function (event) {
-      if (!isCheckoutPage()) return;
-
-      const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
-      const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
-
-      // Check if the changed element is our State Select
-      if (stateSelect && event.target === stateSelect && citySelect) {
-        console.log("State change detected via delegation");
-        filterCityOptions(stateSelect, citySelect);
-      }
-    });
-
-    // 2. Keep the observer only for triggering the INITIAL filter
-    const observer = new MutationObserver(function () {
-      if (!isCheckoutPage()) return;
-
-      const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
-      const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
-
-      if (stateSelect && citySelect && citySelect.dataset.cityFilterInitialized !== "1") {
-        citySelect.dataset.cityFilterInitialized = "1";
-        filterCityOptions(stateSelect, citySelect);
-        console.log("Initial load filter applied");
-      }
-    });
-
     observer.observe(document.body, {
       childList: true,
       subtree: true
     });
+
+    initCityFilter();
   }
 
   if (document.readyState === "loading") {
