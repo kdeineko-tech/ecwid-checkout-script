@@ -2,8 +2,11 @@
   const STATE_FIELD_LABEL = "Choose State";
   const CITY_FIELD_LABEL = "Choose City";
 
-  const CLUB_LOCATION_DESCRIPTION =
-    "Support your local boot camp! Select your home location from the dropdown and they will earn a percentage from your sale.";
+  const STATE_FIELD_DESCRIPTION =
+    "Select the state of your club location.";
+
+  const CITY_FIELD_DESCRIPTION =
+    "Select your club city. Available options update after choosing a state.";
 
   const CITY_MAP = {
     "California": ["Los Angeles", "San Diego", "San Jose", "Sacramento"],
@@ -12,16 +15,15 @@
     "New York": ["New York", "Buffalo", "Albany", "Rochester"]
   };
 
-  let observerStarted = false;
-  let ecwidHookStarted = false;
-  let pollingTimer = null;
-
   function normalize(value) {
     return (value || "").replace(/\s+/g, " ").trim().toLowerCase();
   }
 
   function isCheckoutPage() {
-    return !!document.querySelector(".ec-cart, .ec-checkout");
+    return (
+      !!document.querySelector(".ec-cart") ||
+      !!document.querySelector(".ec-checkout")
+    );
   }
 
   function findSelectByLabelText(labelText) {
@@ -33,7 +35,7 @@
 
       let current = node;
 
-      for (let i = 0; i < 7 && current; i += 1) {
+      for (let i = 0; i < 5 && current; i += 1) {
         const selects = current.querySelectorAll("select");
 
         if (selects.length === 1) return selects[0];
@@ -57,11 +59,12 @@
     return null;
   }
 
-  function findLabelNode(labelText, select) {
+  function findFieldLabelNode(labelText, select) {
     const wanted = normalize(labelText);
+
     let current = select;
 
-    for (let i = 0; i < 8 && current; i += 1) {
+    for (let i = 0; i < 6 && current; i += 1) {
       const labelNode = Array.from(
         current.querySelectorAll("label, div, span")
       ).find(node => normalize(node.textContent) === wanted);
@@ -72,40 +75,6 @@
     }
 
     return null;
-  }
-
-  function removeDuplicateDescriptions() {
-    const descriptions = Array.from(
-      document.querySelectorAll(".club-location-description")
-    );
-
-    descriptions.slice(1).forEach(node => node.remove());
-  }
-
-  function addClubLocationDescription(stateSelect) {
-    const labelNode = findLabelNode(STATE_FIELD_LABEL, stateSelect);
-    if (!labelNode) return false;
-
-    const alreadyExists = document.querySelector(".club-location-description");
-
-    if (alreadyExists && document.body.contains(alreadyExists)) {
-      removeDuplicateDescriptions();
-      return true;
-    }
-
-    const description = document.createElement("div");
-    description.className = "club-location-description";
-    description.textContent = CLUB_LOCATION_DESCRIPTION;
-
-    description.style.fontSize = "16px";
-    description.style.color = "#000";
-    description.style.marginBottom = "14px";
-    description.style.lineHeight = "1.4";
-    description.style.fontWeight = "400";
-
-    labelNode.insertAdjacentElement("beforebegin", description);
-
-    return true;
   }
 
   function isPlaceholder(option) {
@@ -119,8 +88,38 @@
     );
   }
 
+  function addFieldDescription(labelText, descriptionText) {
+    const select = findSelectByLabelText(labelText);
+    if (!select) return;
+
+    const labelNode = findFieldLabelNode(labelText, select);
+    if (!labelNode) return;
+
+    const fieldContainer =
+      select.closest(".ec-form__cell") ||
+      select.closest(".form-control") ||
+      select.parentElement;
+
+    if (!fieldContainer) return;
+
+    if (fieldContainer.querySelector(".custom-field-description")) return;
+
+    const description = document.createElement("div");
+    description.className = "custom-field-description";
+    description.textContent = descriptionText;
+
+    description.style.fontSize = "14px";
+    description.style.color = "#000";
+    description.style.marginTop = "6px";
+    description.style.marginBottom = "10px";
+    description.style.lineHeight = "1.4";
+    description.style.fontWeight = "400";
+
+    labelNode.insertAdjacentElement("afterend", description);
+  }
+
   function filterCityOptions(stateSelect, citySelect) {
-    if (!stateSelect || !citySelect) return false;
+    if (!stateSelect || !citySelect) return;
 
     const selectedStateValue = stateSelect.value;
     const selectedStateText =
@@ -149,7 +148,10 @@
 
       if (!allowedCities || allowedCities.includes(cityText)) {
         option.style.display = "";
-        if (!firstVisible) firstVisible = option;
+
+        if (!firstVisible) {
+          firstVisible = option;
+        }
       } else {
         option.style.display = "none";
       }
@@ -161,44 +163,31 @@
       citySelect.value = firstVisible ? firstVisible.value : "";
       citySelect.dispatchEvent(new Event("change", { bubbles: true }));
     }
-
-    return true;
   }
 
   function applyFieldEnhancements() {
-    if (!isCheckoutPage()) return false;
+    if (!isCheckoutPage()) return;
 
     const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
     const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
 
-    if (!stateSelect || !citySelect) return false;
+    if (!stateSelect || !citySelect) return;
 
-    addClubLocationDescription(stateSelect);
+    addFieldDescription(STATE_FIELD_LABEL, STATE_FIELD_DESCRIPTION);
+    addFieldDescription(CITY_FIELD_LABEL, CITY_FIELD_DESCRIPTION);
+
     filterCityOptions(stateSelect, citySelect);
-
-    return true;
   }
 
-  function startPolling() {
-    if (pollingTimer) clearInterval(pollingTimer);
+  function start() {
+    document.body.addEventListener("change", function (event) {
+      const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
+      const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
 
-    let attempts = 0;
-
-    pollingTimer = setInterval(function () {
-      attempts += 1;
-
-      const applied = applyFieldEnhancements();
-
-      if (applied || attempts >= 80) {
-        clearInterval(pollingTimer);
-        pollingTimer = null;
+      if (event.target === stateSelect && citySelect) {
+        filterCityOptions(stateSelect, citySelect);
       }
-    }, 250);
-  }
-
-  function startObserver() {
-    if (observerStarted) return;
-    observerStarted = true;
+    });
 
     const observer = new MutationObserver(function () {
       applyFieldEnhancements();
@@ -208,46 +197,8 @@
       childList: true,
       subtree: true
     });
-  }
-
-  function startDelegatedChangeListener() {
-    document.body.addEventListener("change", function (event) {
-      const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
-      const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
-
-      if (event.target === stateSelect && citySelect) {
-        filterCityOptions(stateSelect, citySelect);
-      }
-    });
-  }
-
-  function startEcwidHookWhenReady() {
-    if (ecwidHookStarted) return;
-
-    const waitForEcwid = setInterval(function () {
-      if (!window.Ecwid || !Ecwid.OnPageLoaded) return;
-
-      clearInterval(waitForEcwid);
-      ecwidHookStarted = true;
-
-      Ecwid.OnPageLoaded.add(function (page) {
-        if (
-          page &&
-          String(page.type || "").toUpperCase().includes("CHECKOUT")
-        ) {
-          startPolling();
-        }
-      });
-    }, 250);
-  }
-
-  function start() {
-    startDelegatedChangeListener();
-    startObserver();
-    startEcwidHookWhenReady();
 
     applyFieldEnhancements();
-    startPolling();
   }
 
   if (document.readyState === "loading") {
