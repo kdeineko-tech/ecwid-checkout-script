@@ -9,40 +9,36 @@
     "New York": ["New York", "Buffalo", "Albany", "Rochester"]
   };
 
+  let lastStateValue = null;
+  let debounceTimer = null;
+
   function normalize(value) {
     return (value || "").replace(/\s+/g, " ").trim().toLowerCase();
   }
 
   function isCheckoutPage() {
-    return !!document.querySelector(".ec-cart") || !!document.querySelector(".ec-checkout");
+    return !!document.querySelector(".ec-cart, .ec-checkout");
   }
 
   function findSelectByLabelText(labelText) {
     const wanted = normalize(labelText);
-    const nodes = Array.from(document.querySelectorAll("label, div, span"));
+    const labels = Array.from(document.querySelectorAll("label, div, span"));
 
-    for (const node of nodes) {
-      if (normalize(node.textContent) !== wanted) continue;
+    for (const node of labels) {
+      const text = normalize(node.textContent);
 
-      let current = node;
+      if (text !== wanted) continue;
 
-      for (let i = 0; i < 5 && current; i += 1) {
-        const selects = current.querySelectorAll("select");
+      let wrapper = node;
 
-        if (selects.length === 1) return selects[0];
+      for (let i = 0; i < 8 && wrapper; i++) {
+        const select = wrapper.querySelector("select");
+        if (select) return select;
 
-        if (selects.length > 1) {
-          for (const select of selects) {
-            const relation = node.compareDocumentPosition(select);
-            if (relation & Node.DOCUMENT_POSITION_FOLLOWING) {
-              return select;
-            }
-          }
+        const nextSelect = wrapper.nextElementSibling?.querySelector?.("select");
+        if (nextSelect) return nextSelect;
 
-          return selects[0];
-        }
-
-        current = current.parentElement;
+        wrapper = wrapper.parentElement;
       }
     }
 
@@ -60,8 +56,16 @@
     );
   }
 
-  function filterCityOptions(stateSelect, citySelect) {
-    if (!stateSelect || !citySelect) return;
+  function filterCityOptions() {
+    if (!isCheckoutPage()) return;
+
+    const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
+    const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
+
+    if (!stateSelect || !citySelect) {
+      console.log("City filter: state or city select not found");
+      return;
+    }
 
     const selectedStateValue = stateSelect.value;
     const selectedStateText =
@@ -73,70 +77,71 @@
           key => normalize(key) === normalize(selectedStateText)
         );
 
-    console.log("Filtering cities for state:", resolvedKey || selectedStateValue || selectedStateText);
-
     const allowedCities = resolvedKey && CITY_MAP[resolvedKey]
       ? CITY_MAP[resolvedKey].map(normalize)
       : null;
 
-    let firstVisible = null;
+    console.log("City filter running. State:", {
+      value: selectedStateValue,
+      text: selectedStateText,
+      resolvedKey
+    });
 
     Array.from(citySelect.options).forEach(option => {
       if (isPlaceholder(option)) {
-        option.style.display = "";
+        option.hidden = false;
         option.disabled = false;
+        option.style.display = "";
         return;
       }
 
       const cityText = normalize(option.textContent);
+      const isAllowed = !allowedCities || allowedCities.includes(cityText);
 
-      if (!allowedCities || allowedCities.includes(cityText)) {
-        option.style.display = "";
-        option.disabled = false;
-
-        if (!firstVisible) firstVisible = option;
-      } else {
-        option.style.display = "none";
-        option.disabled = true;
-      }
+      option.hidden = !isAllowed;
+      option.disabled = !isAllowed;
+      option.style.display = isAllowed ? "" : "none";
     });
 
     const currentOption = citySelect.options[citySelect.selectedIndex];
 
     if (currentOption && currentOption.disabled) {
-      citySelect.value = firstVisible ? firstVisible.value : "";
+      citySelect.value = "";
+      citySelect.dispatchEvent(new Event("input", { bubbles: true }));
       citySelect.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    lastStateValue = stateSelect.value;
+  }
+
+  function scheduleFilter() {
+    clearTimeout(debounceTimer);
+
+    debounceTimer = setTimeout(function () {
+      filterCityOptions();
+    }, 100);
+  }
+
+  function checkForStateChange() {
+    const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
+
+    if (!stateSelect) return;
+
+    if (stateSelect.value !== lastStateValue) {
+      scheduleFilter();
     }
   }
 
-  function applyFilterIfPossible() {
-    if (!isCheckoutPage()) return;
-
-    const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
-    const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
-
-    if (!stateSelect || !citySelect) return;
-
-    filterCityOptions(stateSelect, citySelect);
-  }
-
   function start() {
-    document.body.addEventListener("change", function (event) {
-      if (!event.target || event.target.tagName !== "SELECT") return;
-
-      const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
-      const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
-
-      if (!stateSelect || !citySelect) return;
-
-      if (event.target === stateSelect) {
-        console.log("State change detected via delegation");
-        filterCityOptions(stateSelect, citySelect);
-      }
-    });
+    document.addEventListener("change", scheduleFilter, true);
+    document.addEventListener("input", scheduleFilter, true);
+    document.addEventListener("click", function () {
+      setTimeout(checkForStateChange, 100);
+      setTimeout(checkForStateChange, 300);
+    }, true);
 
     const observer = new MutationObserver(function () {
-      applyFilterIfPossible();
+      scheduleFilter();
     });
 
     observer.observe(document.body, {
@@ -144,9 +149,10 @@
       subtree: true
     });
 
-    setTimeout(applyFilterIfPossible, 300);
-    setTimeout(applyFilterIfPossible, 800);
-    setTimeout(applyFilterIfPossible, 1500);
+    setTimeout(filterCityOptions, 300);
+    setTimeout(filterCityOptions, 800);
+    setTimeout(filterCityOptions, 1500);
+    setTimeout(filterCityOptions, 2500);
   }
 
   if (document.readyState === "loading") {
