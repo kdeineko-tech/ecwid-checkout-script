@@ -2,6 +2,12 @@
   const STATE_FIELD_LABEL = "Choose State";
   const CITY_FIELD_LABEL = "Choose City";
 
+  const STATE_FIELD_DESCRIPTION =
+    "Please select the state where your club is located.";
+
+  const CITY_FIELD_DESCRIPTION =
+    "Please select your club city. City options update after you select a state.";
+
   const CITY_MAP = {
     "California": ["Los Angeles", "San Diego", "San Jose", "Sacramento"],
     "Texas": ["Houston", "Dallas", "Austin", "San Antonio"],
@@ -61,6 +67,31 @@
     );
   }
 
+  function addFieldDescription(labelText, descriptionText) {
+    const select = findSelectByLabelText(labelText);
+    if (!select) return;
+
+    const fieldContainer =
+      select.closest(".ec-form__cell") ||
+      select.closest(".form-control") ||
+      select.parentElement;
+
+    if (!fieldContainer) return;
+
+    if (fieldContainer.querySelector(".custom-field-description")) return;
+
+    const description = document.createElement("div");
+    description.className = "custom-field-description";
+    description.textContent = descriptionText;
+
+    description.style.fontSize = "13px";
+    description.style.color = "#666";
+    description.style.marginTop = "4px";
+    description.style.lineHeight = "1.4";
+
+    select.insertAdjacentElement("afterend", description);
+  }
+
   function filterCityOptions(stateSelect, citySelect) {
     if (!stateSelect || !citySelect) return;
 
@@ -76,9 +107,10 @@
 
     console.log("Filtering cities for state:", resolvedKey);
 
-    const allowedCities = resolvedKey && CITY_MAP[resolvedKey]
-      ? CITY_MAP[resolvedKey].map(normalize)
-      : null;
+    const allowedCities =
+      resolvedKey && CITY_MAP[resolvedKey]
+        ? CITY_MAP[resolvedKey].map(normalize)
+        : null;
 
     let firstVisible = null;
 
@@ -109,7 +141,7 @@
     }
   }
 
-  function applyInitialFilter() {
+  function applyFieldEnhancements() {
     if (!isCheckoutPage()) return;
 
     const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
@@ -117,7 +149,12 @@
 
     if (!stateSelect || !citySelect) return;
 
+    addFieldDescription(STATE_FIELD_LABEL, STATE_FIELD_DESCRIPTION);
+    addFieldDescription(CITY_FIELD_LABEL, CITY_FIELD_DESCRIPTION);
+
     filterCityOptions(stateSelect, citySelect);
+
+    console.log("Club location fields enhanced");
   }
 
   function start() {
@@ -132,13 +169,7 @@
     });
 
     const observer = new MutationObserver(function () {
-      const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
-      const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
-
-      if (stateSelect && citySelect) {
-        filterCityOptions(stateSelect, citySelect);
-        console.log("Initial/current city filter applied");
-      }
+      applyFieldEnhancements();
     });
 
     observer.observe(document.body, {
@@ -146,7 +177,7 @@
       subtree: true
     });
 
-    applyInitialFilter();
+    applyFieldEnhancements();
   }
 
   if (document.readyState === "loading") {
