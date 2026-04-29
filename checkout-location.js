@@ -5,8 +5,6 @@
   const CLUB_LOCATION_DESCRIPTION =
     "Support your local boot camp! Select your home location from the dropdown and they will earn a percentage from your sale.";
 
-  let lastInjectedTarget = null;
-
   const CITY_MAP = {
     "California": ["Los Angeles", "San Diego", "San Jose", "Sacramento"],
     "Texas": ["Houston", "Dallas", "Austin", "San Antonio"],
@@ -19,10 +17,7 @@
   }
 
   function isCheckoutPage() {
-    return (
-      !!document.querySelector(".ec-cart") ||
-      !!document.querySelector(".ec-checkout")
-    );
+    return !!document.querySelector(".ec-cart, .ec-checkout");
   }
 
   function findSelectByLabelText(labelText) {
@@ -34,22 +29,11 @@
 
       let current = node;
 
-      for (let i = 0; i < 5 && current; i += 1) {
+      for (let i = 0; i < 6 && current; i += 1) {
         const selects = current.querySelectorAll("select");
 
         if (selects.length === 1) return selects[0];
-
-        if (selects.length > 1) {
-          for (const select of selects) {
-            const relation = node.compareDocumentPosition(select);
-
-            if (relation & Node.DOCUMENT_POSITION_FOLLOWING) {
-              return select;
-            }
-          }
-
-          return selects[0];
-        }
+        if (selects.length > 1) return selects[0];
 
         current = current.parentElement;
       }
@@ -58,21 +42,37 @@
     return null;
   }
 
-  function findFieldLabelNode(labelText, select) {
-    const wanted = normalize(labelText);
-    let current = select;
+  function findSharedFieldContainer(stateSelect, citySelect) {
+    let current = stateSelect.parentElement;
 
-    for (let i = 0; i < 7 && current; i += 1) {
-      const labelNode = Array.from(
-        current.querySelectorAll("label, div, span")
-      ).find(node => normalize(node.textContent) === wanted);
-
-      if (labelNode) return labelNode;
+    while (current && current !== document.body) {
+      if (current.contains(stateSelect) && current.contains(citySelect)) {
+        return current;
+      }
 
       current = current.parentElement;
     }
 
     return null;
+  }
+
+  function addClubLocationDescription(stateSelect, citySelect) {
+    const sharedContainer = findSharedFieldContainer(stateSelect, citySelect);
+    if (!sharedContainer) return;
+
+    if (sharedContainer.querySelector(".club-location-description")) return;
+
+    const description = document.createElement("div");
+    description.className = "club-location-description";
+    description.textContent = CLUB_LOCATION_DESCRIPTION;
+
+    description.style.fontSize = "16px";
+    description.style.color = "#000";
+    description.style.marginBottom = "14px";
+    description.style.lineHeight = "1.4";
+    description.style.fontWeight = "400";
+
+    sharedContainer.insertBefore(description, sharedContainer.firstChild);
   }
 
   function isPlaceholder(option) {
@@ -86,38 +86,7 @@
     );
   }
 
-  function addClubLocationDescription() {
-    const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
-    if (!stateSelect) return;
-
-    const labelNode = findFieldLabelNode(STATE_FIELD_LABEL, stateSelect);
-    if (!labelNode) return;
-
-    if (lastInjectedTarget === labelNode) return;
-
-    lastInjectedTarget = labelNode;
-
-    const existing = document.querySelector(".club-location-description");
-    if (existing) existing.remove();
-
-    const description = document.createElement("div");
-    description.className = "club-location-description";
-    description.textContent = CLUB_LOCATION_DESCRIPTION;
-
-    description.style.fontSize = "16px";
-    description.style.color = "#000";
-    description.style.marginBottom = "14px";
-    description.style.lineHeight = "1.4";
-    description.style.fontWeight = "400";
-
-    labelNode.insertAdjacentElement("beforebegin", description);
-
-    console.log("Club location description injected");
-  }
-
   function filterCityOptions(stateSelect, citySelect) {
-    if (!stateSelect || !citySelect) return;
-
     const selectedStateValue = stateSelect.value;
     const selectedStateText =
       stateSelect.options[stateSelect.selectedIndex]?.textContent || "";
@@ -145,10 +114,7 @@
 
       if (!allowedCities || allowedCities.includes(cityText)) {
         option.style.display = "";
-
-        if (!firstVisible) {
-          firstVisible = option;
-        }
+        if (!firstVisible) firstVisible = option;
       } else {
         option.style.display = "none";
       }
@@ -170,7 +136,7 @@
 
     if (!stateSelect || !citySelect) return;
 
-    addClubLocationDescription();
+    addClubLocationDescription(stateSelect, citySelect);
     filterCityOptions(stateSelect, citySelect);
   }
 
@@ -184,13 +150,15 @@
       }
     });
 
-    const observer = new MutationObserver(function () {
-      applyFieldEnhancements();
-    });
+    const observer = new MutationObserver(applyFieldEnhancements);
 
     observer.observe(document.body, {
       childList: true,
       subtree: true
+    });
+
+    Ecwid.OnPageLoaded.add(function () {
+      applyFieldEnhancements();
     });
 
     applyFieldEnhancements();
