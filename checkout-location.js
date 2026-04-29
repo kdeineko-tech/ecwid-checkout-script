@@ -38,11 +38,9 @@
           }
           return selects[0];
         }
-
         current = current.parentElement;
       }
     }
-
     return null;
   }
 
@@ -56,97 +54,107 @@
     );
   }
 
+  // A helper function to force React to recognize a programmatic value change
+  function setReactInputValue(element, value) {
+    const nativeSelectValueSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLSelectElement.prototype,
+      "value"
+    ).set;
+    nativeSelectValueSetter.call(element, value);
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
   function filterCityOptions(stateSelect, citySelect) {
     const selectedStateValue = stateSelect.value;
     const selectedStateText =
       stateSelect.options[stateSelect.selectedIndex]?.textContent || "";
 
-    const stateKey = CITY_MAP[selectedStateValue]
-      ? selectedStateValue
-      : normalize(selectedStateText);
-
-    // Шукаємо ключ без normalize теж
     const resolvedKey = CITY_MAP[selectedStateValue]
       ? selectedStateValue
-      : Object.keys(CITY_MAP).find(k => normalize(k) === normalize(selectedStateText));
+      : Object.keys(CITY_MAP).find((k) => normalize(k) === normalize(selectedStateText));
 
-    console.log(`Filtering cities for state: ${resolvedKey}`);
+    console.log(`[CityFilter] Filtering cities for state: ${resolvedKey || "Unknown"}`);
 
     const allowedCities = resolvedKey && CITY_MAP[resolvedKey]
       ? CITY_MAP[resolvedKey].map(normalize)
       : null;
 
     let firstVisible = null;
+    let currentSelectionIsValid = false;
 
-    Array.from(citySelect.options).forEach(option => {
+    Array.from(citySelect.options).forEach((option) => {
       if (isPlaceholder(option)) {
         option.style.display = "";
+        option.hidden = false;
+        option.disabled = false;
         return;
       }
 
       const cityText = normalize(option.textContent);
 
       if (!allowedCities || allowedCities.includes(cityText)) {
+        // Show option
         option.style.display = "";
+        option.hidden = false;
+        option.disabled = false;
         if (!firstVisible) firstVisible = option;
+        if (citySelect.value === option.value) currentSelectionIsValid = true;
       } else {
+        // Hide and disable option
         option.style.display = "none";
+        option.hidden = true;
+        option.disabled = true;
       }
     });
 
-    // Якщо поточний вибір захований — переключаємо на перший видимий
-    const currentOption = citySelect.options[citySelect.selectedIndex];
-    if (currentOption && currentOption.style.display === "none") {
-      citySelect.value = firstVisible ? firstVisible.value : "";
-      citySelect.dispatchEvent(new Event("change", { bubbles: true }));
+    // If the currently selected city is now hidden, we MUST force a change
+    // using the React-safe setter so Ecwid knows about it.
+    if (!currentSelectionIsValid) {
+      const newValue = firstVisible ? firstVisible.value : "";
+      console.log(`[CityFilter] Forcing city value to: ${newValue}`);
+      setReactInputValue(citySelect, newValue);
     }
   }
-
-  function initCityFilter() {
-    if (!isCheckoutPage()) return;
-
-    const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
-    const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
-
-    if (!stateSelect || !citySelect) {
-      console.log("State or City field not found!");
-      return;
-    }
-
-    console.log("State and City fields found.");
-
-    if (citySelect.dataset.cityFilterInitialized === "1") return;
-    citySelect.dataset.cityFilterInitialized = "1";
-
-    function start() {
-// 1. Use Event Delegation on the body
-document.body.addEventListener("change", function (event) {
-// Check if the changed element is our State Select
-const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
-const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
-
-if (event.target === stateSelect && citySelect) { console.log("State change detected via delegation"); filterCityOptions(stateSelect, citySelect); }});
-
-// 2. Keep the observer only for triggering the INITIAL filter (if a state is pre-selected)const observer = new MutationObserver(function () { const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL); const citySelect = findSelectByLabelText(CITY_FIELD_LABEL); if (stateSelect && citySelect && citySelect.dataset.cityFilterInitialized !== "1") { citySelect.dataset.cityFilterInitialized = "1"; filterCityOptions(stateSelect, citySelect); console.log("Initial load filter applied"); }});
-
-observer.observe(document.body, { childList: true, subtree: true });}
-
-    filterCityOptions(stateSelect, citySelect);
-
-    console.log("City filter initialized");
-  }
-
-  const observer = new MutationObserver(function () {
-    initCityFilter();
-  });
 
   function start() {
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
+    console.log("[CityFilter] Script initialized.");
+
+    // 1. Use capture phase (true) to catch the event before React can swallow it
+    document.body.addEventListener(
+      "change",
+      function (event) {
+        if (!isCheckoutPage()) return;
+
+        const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
+        const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
+
+        // Check if the element that triggered the change is our state select
+        if (stateSelect && event.target === stateSelect && citySelect) {
+          console.log("[CityFilter] State change detected via delegation!");
+          filterCityOptions(stateSelect, citySelect);
+        }
+      },
+      true // <--- TRUE forces it into the capture phase
+    );
+
+    // 2. Observer for initial load and React re-renders
+    const observer = new MutationObserver(function () {
+      if (!isCheckoutPage()) return;
+
+      const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
+      const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
+
+      if (stateSelect && citySelect && citySelect.dataset.cityFilterInitialized !== "1") {
+        citySelect.dataset.cityFilterInitialized = "1";
+        console.log("[CityFilter] Initial load filter applied via observer.");
+        filterCityOptions(stateSelect, citySelect);
+      }
     });
 
-    initCityFilter();
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
   }
 
   if (document.readyState === "loading") {
