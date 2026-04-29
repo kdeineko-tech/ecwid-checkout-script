@@ -2,11 +2,8 @@
   const STATE_FIELD_LABEL = "Choose State";
   const CITY_FIELD_LABEL = "Choose City";
 
-  const STATE_FIELD_DESCRIPTION =
-    "Select the state of your club location.";
-
-  const CITY_FIELD_DESCRIPTION =
-    "Select your club city. Available options update after choosing a state.";
+  const CLUB_LOCATION_DESCRIPTION =
+    "Support your local boot camp! Select your home location from the dropdown and they will earn a percentage from your sale.";
 
   const CITY_MAP = {
     "California": ["Los Angeles", "San Diego", "San Jose", "Sacramento"],
@@ -61,10 +58,9 @@
 
   function findFieldLabelNode(labelText, select) {
     const wanted = normalize(labelText);
-
     let current = select;
 
-    for (let i = 0; i < 6 && current; i += 1) {
+    for (let i = 0; i < 7 && current; i += 1) {
       const labelNode = Array.from(
         current.querySelectorAll("label, div, span")
       ).find(node => normalize(node.textContent) === wanted);
@@ -88,34 +84,37 @@
     );
   }
 
-  function addFieldDescription(labelText, descriptionText) {
-    const select = findSelectByLabelText(labelText);
-    if (!select) return;
+  function addClubLocationDescription() {
+    const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
+    if (!stateSelect) return false;
 
-    const labelNode = findFieldLabelNode(labelText, select);
-    if (!labelNode) return;
+    const labelNode = findFieldLabelNode(STATE_FIELD_LABEL, stateSelect);
+    if (!labelNode) return false;
 
     const fieldContainer =
-      select.closest(".ec-form__cell") ||
-      select.closest(".form-control") ||
-      select.parentElement;
+      stateSelect.closest(".ec-form__cell") ||
+      stateSelect.closest(".form-control") ||
+      labelNode.parentElement;
 
-    if (!fieldContainer) return;
+    if (!fieldContainer) return false;
 
-    if (fieldContainer.querySelector(".custom-field-description")) return;
+    if (fieldContainer.querySelector(".club-location-description")) {
+      return true;
+    }
 
     const description = document.createElement("div");
-    description.className = "custom-field-description";
-    description.textContent = descriptionText;
+    description.className = "club-location-description";
+    description.textContent = CLUB_LOCATION_DESCRIPTION;
 
-    description.style.fontSize = "14px";
+    description.style.fontSize = "16px";
     description.style.color = "#000";
-    description.style.marginTop = "6px";
-    description.style.marginBottom = "10px";
+    description.style.marginBottom = "14px";
     description.style.lineHeight = "1.4";
     description.style.fontWeight = "400";
 
-    labelNode.insertAdjacentElement("afterend", description);
+    labelNode.insertAdjacentElement("beforebegin", description);
+
+    return true;
   }
 
   function filterCityOptions(stateSelect, citySelect) {
@@ -173,10 +172,19 @@
 
     if (!stateSelect || !citySelect) return;
 
-    addFieldDescription(STATE_FIELD_LABEL, STATE_FIELD_DESCRIPTION);
-    addFieldDescription(CITY_FIELD_LABEL, CITY_FIELD_DESCRIPTION);
-
+    addClubLocationDescription();
     filterCityOptions(stateSelect, citySelect);
+  }
+
+  function scheduleApplyFieldEnhancements() {
+    requestAnimationFrame(function () {
+      applyFieldEnhancements();
+
+      setTimeout(applyFieldEnhancements, 100);
+      setTimeout(applyFieldEnhancements, 300);
+      setTimeout(applyFieldEnhancements, 700);
+      setTimeout(applyFieldEnhancements, 1200);
+    });
   }
 
   function start() {
@@ -190,7 +198,7 @@
     });
 
     const observer = new MutationObserver(function () {
-      applyFieldEnhancements();
+      scheduleApplyFieldEnhancements();
     });
 
     observer.observe(document.body, {
@@ -198,7 +206,7 @@
       subtree: true
     });
 
-    applyFieldEnhancements();
+    scheduleApplyFieldEnhancements();
   }
 
   if (document.readyState === "loading") {
