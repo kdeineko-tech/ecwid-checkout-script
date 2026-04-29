@@ -25,21 +25,17 @@
       if (normalize(node.textContent) !== wanted) continue;
 
       let current = node;
-
       for (let i = 0; i < 5 && current; i += 1) {
         const selects = current.querySelectorAll("select");
-
         if (selects.length === 1) return selects[0];
 
         if (selects.length > 1) {
           for (const select of selects) {
             const relation = node.compareDocumentPosition(select);
-
             if (relation & Node.DOCUMENT_POSITION_FOLLOWING) {
               return select;
             }
           }
-
           return selects[0];
         }
 
@@ -52,7 +48,6 @@
 
   function isPlaceholder(option) {
     const text = normalize(option.textContent);
-
     return (
       !option.value ||
       text.includes("please choose") ||
@@ -62,19 +57,19 @@
   }
 
   function filterCityOptions(stateSelect, citySelect) {
-    if (!stateSelect || !citySelect) return;
-
     const selectedStateValue = stateSelect.value;
     const selectedStateText =
       stateSelect.options[stateSelect.selectedIndex]?.textContent || "";
 
+    const stateKey = CITY_MAP[selectedStateValue]
+      ? selectedStateValue
+      : normalize(selectedStateText);
+
     const resolvedKey = CITY_MAP[selectedStateValue]
       ? selectedStateValue
-      : Object.keys(CITY_MAP).find(
-          key => normalize(key) === normalize(selectedStateText)
-        );
+      : Object.keys(CITY_MAP).find(k => normalize(k) === normalize(selectedStateText));
 
-    console.log("Filtering cities for state:", resolvedKey);
+    console.log(`Filtering cities for state: ${resolvedKey}`);
 
     const allowedCities = resolvedKey && CITY_MAP[resolvedKey]
       ? CITY_MAP[resolvedKey].map(normalize)
@@ -92,52 +87,45 @@
 
       if (!allowedCities || allowedCities.includes(cityText)) {
         option.style.display = "";
-
-        if (!firstVisible) {
-          firstVisible = option;
-        }
+        if (!firstVisible) firstVisible = option;
       } else {
         option.style.display = "none";
       }
     });
 
     const currentOption = citySelect.options[citySelect.selectedIndex];
-
     if (currentOption && currentOption.style.display === "none") {
       citySelect.value = firstVisible ? firstVisible.value : "";
       citySelect.dispatchEvent(new Event("change", { bubbles: true }));
     }
   }
 
-  function applyInitialFilter() {
-    if (!isCheckoutPage()) return;
-
-    const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
-    const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
-
-    if (!stateSelect || !citySelect) return;
-
-    filterCityOptions(stateSelect, citySelect);
-  }
-
   function start() {
+    // 1. Use Event Delegation on the body for state changes
     document.body.addEventListener("change", function (event) {
+      if (!isCheckoutPage()) return;
+
       const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
       const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
 
-      if (event.target === stateSelect && citySelect) {
+      // Check if the changed element is our State Select
+      if (stateSelect && event.target === stateSelect && citySelect) {
         console.log("State change detected via delegation");
         filterCityOptions(stateSelect, citySelect);
       }
     });
 
+    // 2. Keep the observer only for triggering the INITIAL filter
     const observer = new MutationObserver(function () {
+      if (!isCheckoutPage()) return;
+
       const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
       const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
 
-      if (stateSelect && citySelect) {
+      if (stateSelect && citySelect && citySelect.dataset.cityFilterInitialized !== "1") {
+        citySelect.dataset.cityFilterInitialized = "1";
         filterCityOptions(stateSelect, citySelect);
-        console.log("Initial/current city filter applied");
+        console.log("Initial load filter applied");
       }
     });
 
@@ -145,8 +133,6 @@
       childList: true,
       subtree: true
     });
-
-    applyInitialFilter();
   }
 
   if (document.readyState === "loading") {
