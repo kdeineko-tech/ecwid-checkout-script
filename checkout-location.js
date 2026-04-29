@@ -2,12 +2,6 @@
   const STATE_FIELD_LABEL = "Choose State";
   const CITY_FIELD_LABEL = "Choose City";
 
-  const STATE_FIELD_DESCRIPTION =
-    "Select the state of your club location.";
-
-  const CITY_FIELD_DESCRIPTION =
-    "Select your club city. Available options update after choosing a state.";
-
   const CITY_MAP = {
     "California": ["Los Angeles", "San Diego", "San Jose", "Sacramento"],
     "Texas": ["Houston", "Dallas", "Austin", "San Antonio"],
@@ -20,10 +14,7 @@
   }
 
   function isCheckoutPage() {
-    return (
-      !!document.querySelector(".ec-cart") ||
-      !!document.querySelector(".ec-checkout")
-    );
+    return !!document.querySelector(".ec-cart") || !!document.querySelector(".ec-checkout");
   }
 
   function findSelectByLabelText(labelText) {
@@ -59,24 +50,6 @@
     return null;
   }
 
-  function findFieldLabelNode(labelText, select) {
-    const wanted = normalize(labelText);
-
-    let current = select;
-
-    for (let i = 0; i < 6 && current; i += 1) {
-      const labelNode = Array.from(
-        current.querySelectorAll("label, div, span")
-      ).find(node => normalize(node.textContent) === wanted);
-
-      if (labelNode) return labelNode;
-
-      current = current.parentElement;
-    }
-
-    return null;
-  }
-
   function isPlaceholder(option) {
     const text = normalize(option.textContent);
 
@@ -86,36 +59,6 @@
       text.includes("select") ||
       text.includes("choose")
     );
-  }
-
-  function addFieldDescription(labelText, descriptionText) {
-    const select = findSelectByLabelText(labelText);
-    if (!select) return;
-
-    const labelNode = findFieldLabelNode(labelText, select);
-    if (!labelNode) return;
-
-    const fieldContainer =
-      select.closest(".ec-form__cell") ||
-      select.closest(".form-control") ||
-      select.parentElement;
-
-    if (!fieldContainer) return;
-
-    if (fieldContainer.querySelector(".custom-field-description")) return;
-
-    const description = document.createElement("div");
-    description.className = "custom-field-description";
-    description.textContent = descriptionText;
-
-    description.style.fontSize = "14px";
-    description.style.color = "#000";
-    description.style.marginTop = "6px";
-    description.style.marginBottom = "10px";
-    description.style.lineHeight = "1.4";
-    description.style.fontWeight = "400";
-
-    labelNode.insertAdjacentElement("afterend", description);
   }
 
   function filterCityOptions(stateSelect, citySelect) {
@@ -131,10 +74,11 @@
           key => normalize(key) === normalize(selectedStateText)
         );
 
-    const allowedCities =
-      resolvedKey && CITY_MAP[resolvedKey]
-        ? CITY_MAP[resolvedKey].map(normalize)
-        : null;
+    console.log("Filtering cities for state:", resolvedKey);
+
+    const allowedCities = resolvedKey && CITY_MAP[resolvedKey]
+      ? CITY_MAP[resolvedKey].map(normalize)
+      : null;
 
     let firstVisible = null;
 
@@ -165,16 +109,13 @@
     }
   }
 
-  function applyFieldEnhancements() {
+  function applyInitialFilter() {
     if (!isCheckoutPage()) return;
 
     const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
     const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
 
     if (!stateSelect || !citySelect) return;
-
-    addFieldDescription(STATE_FIELD_LABEL, STATE_FIELD_DESCRIPTION);
-    addFieldDescription(CITY_FIELD_LABEL, CITY_FIELD_DESCRIPTION);
 
     filterCityOptions(stateSelect, citySelect);
   }
@@ -185,12 +126,19 @@
       const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
 
       if (event.target === stateSelect && citySelect) {
+        console.log("State change detected via delegation");
         filterCityOptions(stateSelect, citySelect);
       }
     });
 
     const observer = new MutationObserver(function () {
-      applyFieldEnhancements();
+      const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
+      const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
+
+      if (stateSelect && citySelect) {
+        filterCityOptions(stateSelect, citySelect);
+        console.log("Initial/current city filter applied");
+      }
     });
 
     observer.observe(document.body, {
@@ -198,7 +146,7 @@
       subtree: true
     });
 
-    applyFieldEnhancements();
+    applyInitialFilter();
   }
 
   if (document.readyState === "loading") {
