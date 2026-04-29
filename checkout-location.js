@@ -3,10 +3,10 @@
   const CITY_FIELD_LABEL = "Choose City";
 
   const STATE_FIELD_DESCRIPTION =
-    "Please select the state where your club is located.";
+    "Select the state of your club location.";
 
   const CITY_FIELD_DESCRIPTION =
-    "Please select your club city. City options update after you select a state.";
+    "Select your club city. Available options update after choosing a state.";
 
   const CITY_MAP = {
     "California": ["Los Angeles", "San Diego", "San Jose", "Sacramento"],
@@ -20,7 +20,10 @@
   }
 
   function isCheckoutPage() {
-    return !!document.querySelector(".ec-cart") || !!document.querySelector(".ec-checkout");
+    return (
+      !!document.querySelector(".ec-cart") ||
+      !!document.querySelector(".ec-checkout")
+    );
   }
 
   function findSelectByLabelText(labelText) {
@@ -56,6 +59,24 @@
     return null;
   }
 
+  function findFieldLabelNode(labelText, select) {
+    const wanted = normalize(labelText);
+
+    let current = select;
+
+    for (let i = 0; i < 6 && current; i += 1) {
+      const labelNode = Array.from(
+        current.querySelectorAll("label, div, span")
+      ).find(node => normalize(node.textContent) === wanted);
+
+      if (labelNode) return labelNode;
+
+      current = current.parentElement;
+    }
+
+    return null;
+  }
+
   function isPlaceholder(option) {
     const text = normalize(option.textContent);
 
@@ -71,6 +92,9 @@
     const select = findSelectByLabelText(labelText);
     if (!select) return;
 
+    const labelNode = findFieldLabelNode(labelText, select);
+    if (!labelNode) return;
+
     const fieldContainer =
       select.closest(".ec-form__cell") ||
       select.closest(".form-control") ||
@@ -84,12 +108,14 @@
     description.className = "custom-field-description";
     description.textContent = descriptionText;
 
-    description.style.fontSize = "13px";
-    description.style.color = "#666";
-    description.style.marginTop = "4px";
+    description.style.fontSize = "14px";
+    description.style.color = "#000";
+    description.style.marginTop = "6px";
+    description.style.marginBottom = "10px";
     description.style.lineHeight = "1.4";
+    description.style.fontWeight = "400";
 
-    select.insertAdjacentElement("afterend", description);
+    labelNode.insertAdjacentElement("afterend", description);
   }
 
   function filterCityOptions(stateSelect, citySelect) {
@@ -104,8 +130,6 @@
       : Object.keys(CITY_MAP).find(
           key => normalize(key) === normalize(selectedStateText)
         );
-
-    console.log("Filtering cities for state:", resolvedKey);
 
     const allowedCities =
       resolvedKey && CITY_MAP[resolvedKey]
@@ -153,8 +177,6 @@
     addFieldDescription(CITY_FIELD_LABEL, CITY_FIELD_DESCRIPTION);
 
     filterCityOptions(stateSelect, citySelect);
-
-    console.log("Club location fields enhanced");
   }
 
   function start() {
@@ -163,7 +185,6 @@
       const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
 
       if (event.target === stateSelect && citySelect) {
-        console.log("State change detected via delegation");
         filterCityOptions(stateSelect, citySelect);
       }
     });
