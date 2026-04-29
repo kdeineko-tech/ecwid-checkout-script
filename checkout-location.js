@@ -58,10 +58,9 @@
 
   function findFieldLabelNode(labelText, select) {
     const wanted = normalize(labelText);
-
     let current = select;
 
-    for (let i = 0; i < 6 && current; i += 1) {
+    for (let i = 0; i < 7 && current; i += 1) {
       const labelNode = Array.from(
         current.querySelectorAll("label, div, span")
       ).find(node => normalize(node.textContent) === wanted);
@@ -87,19 +86,21 @@
 
   function addClubLocationDescription() {
     const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
-    if (!stateSelect) return;
+    if (!stateSelect) return false;
 
     const labelNode = findFieldLabelNode(STATE_FIELD_LABEL, stateSelect);
-    if (!labelNode) return;
+    if (!labelNode) return false;
 
     const fieldContainer =
       stateSelect.closest(".ec-form__cell") ||
       stateSelect.closest(".form-control") ||
       labelNode.parentElement;
 
-    if (!fieldContainer) return;
+    if (!fieldContainer) return false;
 
-    if (fieldContainer.querySelector(".club-location-description")) return;
+    if (fieldContainer.querySelector(".club-location-description")) {
+      return true;
+    }
 
     const description = document.createElement("div");
     description.className = "club-location-description";
@@ -112,6 +113,8 @@
     description.style.fontWeight = "400";
 
     labelNode.insertAdjacentElement("beforebegin", description);
+
+    return true;
   }
 
   function filterCityOptions(stateSelect, citySelect) {
@@ -173,6 +176,17 @@
     filterCityOptions(stateSelect, citySelect);
   }
 
+  function scheduleApplyFieldEnhancements() {
+    requestAnimationFrame(function () {
+      applyFieldEnhancements();
+
+      setTimeout(applyFieldEnhancements, 100);
+      setTimeout(applyFieldEnhancements, 300);
+      setTimeout(applyFieldEnhancements, 700);
+      setTimeout(applyFieldEnhancements, 1200);
+    });
+  }
+
   function start() {
     document.body.addEventListener("change", function (event) {
       const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
@@ -184,7 +198,7 @@
     });
 
     const observer = new MutationObserver(function () {
-      applyFieldEnhancements();
+      scheduleApplyFieldEnhancements();
     });
 
     observer.observe(document.body, {
@@ -192,7 +206,7 @@
       subtree: true
     });
 
-    applyFieldEnhancements();
+    scheduleApplyFieldEnhancements();
   }
 
   if (document.readyState === "loading") {
