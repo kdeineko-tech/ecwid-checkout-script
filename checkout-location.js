@@ -25,17 +25,21 @@
       if (normalize(node.textContent) !== wanted) continue;
 
       let current = node;
+
       for (let i = 0; i < 5 && current; i += 1) {
         const selects = current.querySelectorAll("select");
+
         if (selects.length === 1) return selects[0];
 
         if (selects.length > 1) {
           for (const select of selects) {
             const relation = node.compareDocumentPosition(select);
+
             if (relation & Node.DOCUMENT_POSITION_FOLLOWING) {
               return select;
             }
           }
+
           return selects[0];
         }
 
@@ -48,6 +52,7 @@
 
   function isPlaceholder(option) {
     const text = normalize(option.textContent);
+
     return (
       !option.value ||
       text.includes("please choose") ||
@@ -57,20 +62,19 @@
   }
 
   function filterCityOptions(stateSelect, citySelect) {
+    if (!stateSelect || !citySelect) return;
+
     const selectedStateValue = stateSelect.value;
     const selectedStateText =
       stateSelect.options[stateSelect.selectedIndex]?.textContent || "";
 
-    const stateKey = CITY_MAP[selectedStateValue]
-      ? selectedStateValue
-      : normalize(selectedStateText);
-
-    // Шукаємо ключ без normalize теж
     const resolvedKey = CITY_MAP[selectedStateValue]
       ? selectedStateValue
-      : Object.keys(CITY_MAP).find(k => normalize(k) === normalize(selectedStateText));
+      : Object.keys(CITY_MAP).find(
+          key => normalize(key) === normalize(selectedStateText)
+        );
 
-    console.log(`Filtering cities for state: ${resolvedKey}`);
+    console.log("Filtering cities for state:", resolvedKey);
 
     const allowedCities = resolvedKey && CITY_MAP[resolvedKey]
       ? CITY_MAP[resolvedKey].map(normalize)
@@ -88,56 +92,61 @@
 
       if (!allowedCities || allowedCities.includes(cityText)) {
         option.style.display = "";
-        if (!firstVisible) firstVisible = option;
+
+        if (!firstVisible) {
+          firstVisible = option;
+        }
       } else {
         option.style.display = "none";
       }
     });
 
-    // Якщо поточний вибір захований — переключаємо на перший видимий
     const currentOption = citySelect.options[citySelect.selectedIndex];
+
     if (currentOption && currentOption.style.display === "none") {
       citySelect.value = firstVisible ? firstVisible.value : "";
       citySelect.dispatchEvent(new Event("change", { bubbles: true }));
     }
   }
 
-  function initCityFilter() {
+  function applyInitialFilter() {
     if (!isCheckoutPage()) return;
 
     const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
     const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
 
-    if (!stateSelect || !citySelect) {
-      console.log("State or City field not found!");
-      return;
-    }
-
-    console.log("State and City fields found.");
-
-    if (citySelect.dataset.cityFilterInitialized === "1") return;
-    citySelect.dataset.cityFilterInitialized = "1";
-
-    stateSelect.addEventListener("change", function () {
-      filterCityOptions(stateSelect, citySelect);
-    });
+    if (!stateSelect || !citySelect) return;
 
     filterCityOptions(stateSelect, citySelect);
-
-    console.log("City filter initialized");
   }
 
-  const observer = new MutationObserver(function () {
-    initCityFilter();
-  });
-
   function start() {
+    document.body.addEventListener("change", function (event) {
+      const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
+      const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
+
+      if (event.target === stateSelect && citySelect) {
+        console.log("State change detected via delegation");
+        filterCityOptions(stateSelect, citySelect);
+      }
+    });
+
+    const observer = new MutationObserver(function () {
+      const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
+      const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
+
+      if (stateSelect && citySelect) {
+        filterCityOptions(stateSelect, citySelect);
+        console.log("Initial/current city filter applied");
+      }
+    });
+
     observer.observe(document.body, {
       childList: true,
       subtree: true
     });
 
-    initCityFilter();
+    applyInitialFilter();
   }
 
   if (document.readyState === "loading") {
