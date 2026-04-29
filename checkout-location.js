@@ -12,6 +12,10 @@
     "New York": ["New York", "Buffalo", "Albany", "Rochester"]
   };
 
+  let observerStarted = false;
+  let ecwidHookStarted = false;
+  let pollingTimer = null;
+
   function normalize(value) {
     return (value || "").replace(/\s+/g, " ").trim().toLowerCase();
   }
@@ -29,11 +33,22 @@
 
       let current = node;
 
-      for (let i = 0; i < 6 && current; i += 1) {
+      for (let i = 0; i < 7 && current; i += 1) {
         const selects = current.querySelectorAll("select");
 
         if (selects.length === 1) return selects[0];
-        if (selects.length > 1) return selects[0];
+
+        if (selects.length > 1) {
+          for (const select of selects) {
+            const relation = node.compareDocumentPosition(select);
+
+            if (relation & Node.DOCUMENT_POSITION_FOLLOWING) {
+              return select;
+            }
+          }
+
+          return selects[0];
+        }
 
         current = current.parentElement;
       }
@@ -42,13 +57,16 @@
     return null;
   }
 
-  function findSharedFieldContainer(stateSelect, citySelect) {
-    let current = stateSelect.parentElement;
+  function findLabelNode(labelText, select) {
+    const wanted = normalize(labelText);
+    let current = select;
 
-    while (current && current !== document.body) {
-      if (current.contains(stateSelect) && current.contains(citySelect)) {
-        return current;
-      }
+    for (let i = 0; i < 8 && current; i += 1) {
+      const labelNode = Array.from(
+        current.querySelectorAll("label, div, span")
+      ).find(node => normalize(node.textContent) === wanted);
+
+      if (labelNode) return labelNode;
 
       current = current.parentElement;
     }
@@ -56,11 +74,24 @@
     return null;
   }
 
-  function addClubLocationDescription(stateSelect, citySelect) {
-    const sharedContainer = findSharedFieldContainer(stateSelect, citySelect);
-    if (!sharedContainer) return;
+  function removeDuplicateDescriptions() {
+    const descriptions = Array.from(
+      document.querySelectorAll(".club-location-description")
+    );
 
-    if (sharedContainer.querySelector(".club-location-description")) return;
+    descriptions.slice(1).forEach(node => node.remove());
+  }
+
+  function addClubLocationDescription(stateSelect) {
+    const labelNode = findLabelNode(STATE_FIELD_LABEL, stateSelect);
+    if (!labelNode) return false;
+
+    const alreadyExists = document.querySelector(".club-location-description");
+
+    if (alreadyExists && document.body.contains(alreadyExists)) {
+      removeDuplicateDescriptions();
+      return true;
+    }
 
     const description = document.createElement("div");
     description.className = "club-location-description";
@@ -72,7 +103,9 @@
     description.style.lineHeight = "1.4";
     description.style.fontWeight = "400";
 
-    sharedContainer.insertBefore(description, sharedContainer.firstChild);
+    labelNode.insertAdjacentElement("beforebegin", description);
+
+    return true;
   }
 
   function isPlaceholder(option) {
@@ -87,6 +120,8 @@
   }
 
   function filterCityOptions(stateSelect, citySelect) {
+    if (!stateSelect || !citySelect) return false;
+
     const selectedStateValue = stateSelect.value;
     const selectedStateText =
       stateSelect.options[stateSelect.selectedIndex]?.textContent || "";
@@ -126,21 +161,56 @@
       citySelect.value = firstVisible ? firstVisible.value : "";
       citySelect.dispatchEvent(new Event("change", { bubbles: true }));
     }
+
+    return true;
   }
 
   function applyFieldEnhancements() {
-    if (!isCheckoutPage()) return;
+    if (!isCheckoutPage()) return false;
 
     const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
     const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
 
-    if (!stateSelect || !citySelect) return;
+    if (!stateSelect || !citySelect) return false;
 
-    addClubLocationDescription(stateSelect, citySelect);
+    addClubLocationDescription(stateSelect);
     filterCityOptions(stateSelect, citySelect);
+
+    return true;
   }
 
-  function start() {
+  function startPolling() {
+    if (pollingTimer) clearInterval(pollingTimer);
+
+    let attempts = 0;
+
+    pollingTimer = setInterval(function () {
+      attempts += 1;
+
+      const applied = applyFieldEnhancements();
+
+      if (applied || attempts >= 80) {
+        clearInterval(pollingTimer);
+        pollingTimer = null;
+      }
+    }, 250);
+  }
+
+  function startObserver() {
+    if (observerStarted) return;
+    observerStarted = true;
+
+    const observer = new MutationObserver(function () {
+      applyFieldEnhancements();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  }
+
+  function startDelegatedChangeListener() {
     document.body.addEventListener("change", function (event) {
       const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
       const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
@@ -149,19 +219,35 @@
         filterCityOptions(stateSelect, citySelect);
       }
     });
+  }
 
-    const observer = new MutationObserver(applyFieldEnhancements);
+  function startEcwidHookWhenReady() {
+    if (ecwidHookStarted) return;
 
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
+    const waitForEcwid = setInterval(function () {
+      if (!window.Ecwid || !Ecwid.OnPageLoaded) return;
 
-    Ecwid.OnPageLoaded.add(function () {
-      applyFieldEnhancements();
-    });
+      clearInterval(waitForEcwid);
+      ecwidHookStarted = true;
+
+      Ecwid.OnPageLoaded.add(function (page) {
+        if (
+          page &&
+          String(page.type || "").toUpperCase().includes("CHECKOUT")
+        ) {
+          startPolling();
+        }
+      });
+    }, 250);
+  }
+
+  function start() {
+    startDelegatedChangeListener();
+    startObserver();
+    startEcwidHookWhenReady();
 
     applyFieldEnhancements();
+    startPolling();
   }
 
   if (document.readyState === "loading") {
