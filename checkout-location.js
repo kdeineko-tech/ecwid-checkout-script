@@ -1,5 +1,4 @@
 (function () {
-
   const STATE_FIELD_LABEL = "Choose State";
   const CITY_FIELD_LABEL = "Choose City";
 
@@ -26,6 +25,7 @@
       if (normalize(node.textContent) !== wanted) continue;
 
       let current = node;
+
       for (let i = 0; i < 5 && current; i += 1) {
         const selects = current.querySelectorAll("select");
 
@@ -38,6 +38,7 @@
               return select;
             }
           }
+
           return selects[0];
         }
 
@@ -50,6 +51,7 @@
 
   function isPlaceholder(option) {
     const text = normalize(option.textContent);
+
     return (
       !option.value ||
       text.includes("please choose") ||
@@ -59,15 +61,19 @@
   }
 
   function filterCityOptions(stateSelect, citySelect) {
+    if (!stateSelect || !citySelect) return;
+
     const selectedStateValue = stateSelect.value;
     const selectedStateText =
       stateSelect.options[stateSelect.selectedIndex]?.textContent || "";
 
     const resolvedKey = CITY_MAP[selectedStateValue]
       ? selectedStateValue
-      : Object.keys(CITY_MAP).find(k => normalize(k) === normalize(selectedStateText));
+      : Object.keys(CITY_MAP).find(
+          key => normalize(key) === normalize(selectedStateText)
+        );
 
-    console.log(`Filtering cities for state: ${resolvedKey}`);
+    console.log("Filtering cities for state:", resolvedKey || selectedStateValue || selectedStateText);
 
     const allowedCities = resolvedKey && CITY_MAP[resolvedKey]
       ? CITY_MAP[resolvedKey].map(normalize)
@@ -78,6 +84,7 @@
     Array.from(citySelect.options).forEach(option => {
       if (isPlaceholder(option)) {
         option.style.display = "";
+        option.disabled = false;
         return;
       }
 
@@ -85,24 +92,38 @@
 
       if (!allowedCities || allowedCities.includes(cityText)) {
         option.style.display = "";
+        option.disabled = false;
+
         if (!firstVisible) firstVisible = option;
       } else {
         option.style.display = "none";
+        option.disabled = true;
       }
     });
 
     const currentOption = citySelect.options[citySelect.selectedIndex];
-    if (currentOption && currentOption.style.display === "none") {
+
+    if (currentOption && currentOption.disabled) {
       citySelect.value = firstVisible ? firstVisible.value : "";
       citySelect.dispatchEvent(new Event("change", { bubbles: true }));
     }
   }
 
-  function start() {
+  function applyFilterIfPossible() {
     if (!isCheckoutPage()) return;
 
-    // ✅ 1. EVENT DELEGATION (ключове виправлення)
+    const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
+    const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
+
+    if (!stateSelect || !citySelect) return;
+
+    filterCityOptions(stateSelect, citySelect);
+  }
+
+  function start() {
     document.body.addEventListener("change", function (event) {
+      if (!event.target || event.target.tagName !== "SELECT") return;
+
       const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
       const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
 
@@ -114,26 +135,18 @@
       }
     });
 
-    // ✅ 2. OBSERVER тільки для initial load
     const observer = new MutationObserver(function () {
-      const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
-      const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
-
-      if (!stateSelect || !citySelect) return;
-
-      if (citySelect.dataset.cityFilterInitialized !== "1") {
-        citySelect.dataset.cityFilterInitialized = "1";
-
-        filterCityOptions(stateSelect, citySelect);
-
-        console.log("Initial load filter applied");
-      }
+      applyFilterIfPossible();
     });
 
     observer.observe(document.body, {
       childList: true,
       subtree: true
     });
+
+    setTimeout(applyFilterIfPossible, 300);
+    setTimeout(applyFilterIfPossible, 800);
+    setTimeout(applyFilterIfPossible, 1500);
   }
 
   if (document.readyState === "loading") {
@@ -141,5 +154,4 @@
   } else {
     start();
   }
-
 })();
