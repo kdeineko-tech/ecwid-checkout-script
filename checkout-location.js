@@ -1,4 +1,5 @@
 (function () {
+
   const STATE_FIELD_LABEL = "Choose State";
   const CITY_FIELD_LABEL = "Choose City";
 
@@ -27,6 +28,7 @@
       let current = node;
       for (let i = 0; i < 5 && current; i += 1) {
         const selects = current.querySelectorAll("select");
+
         if (selects.length === 1) return selects[0];
 
         if (selects.length > 1) {
@@ -38,9 +40,11 @@
           }
           return selects[0];
         }
+
         current = current.parentElement;
       }
     }
+
     return null;
   }
 
@@ -54,16 +58,6 @@
     );
   }
 
-  // A helper function to force React to recognize a programmatic value change
-  function setReactInputValue(element, value) {
-    const nativeSelectValueSetter = Object.getOwnPropertyDescriptor(
-      window.HTMLSelectElement.prototype,
-      "value"
-    ).set;
-    nativeSelectValueSetter.call(element, value);
-    element.dispatchEvent(new Event("change", { bubbles: true }));
-  }
-
   function filterCityOptions(stateSelect, citySelect) {
     const selectedStateValue = stateSelect.value;
     const selectedStateText =
@@ -71,89 +65,74 @@
 
     const resolvedKey = CITY_MAP[selectedStateValue]
       ? selectedStateValue
-      : Object.keys(CITY_MAP).find((k) => normalize(k) === normalize(selectedStateText));
+      : Object.keys(CITY_MAP).find(k => normalize(k) === normalize(selectedStateText));
 
-    console.log(`[CityFilter] Filtering cities for state: ${resolvedKey || "Unknown"}`);
+    console.log(`Filtering cities for state: ${resolvedKey}`);
 
     const allowedCities = resolvedKey && CITY_MAP[resolvedKey]
       ? CITY_MAP[resolvedKey].map(normalize)
       : null;
 
     let firstVisible = null;
-    let currentSelectionIsValid = false;
 
-    Array.from(citySelect.options).forEach((option) => {
+    Array.from(citySelect.options).forEach(option => {
       if (isPlaceholder(option)) {
         option.style.display = "";
-        option.hidden = false;
-        option.disabled = false;
         return;
       }
 
       const cityText = normalize(option.textContent);
 
       if (!allowedCities || allowedCities.includes(cityText)) {
-        // Show option
         option.style.display = "";
-        option.hidden = false;
-        option.disabled = false;
         if (!firstVisible) firstVisible = option;
-        if (citySelect.value === option.value) currentSelectionIsValid = true;
       } else {
-        // Hide and disable option
         option.style.display = "none";
-        option.hidden = true;
-        option.disabled = true;
       }
     });
 
-    // If the currently selected city is now hidden, we MUST force a change
-    // using the React-safe setter so Ecwid knows about it.
-    if (!currentSelectionIsValid) {
-      const newValue = firstVisible ? firstVisible.value : "";
-      console.log(`[CityFilter] Forcing city value to: ${newValue}`);
-      setReactInputValue(citySelect, newValue);
+    const currentOption = citySelect.options[citySelect.selectedIndex];
+    if (currentOption && currentOption.style.display === "none") {
+      citySelect.value = firstVisible ? firstVisible.value : "";
+      citySelect.dispatchEvent(new Event("change", { bubbles: true }));
     }
   }
 
   function start() {
-    console.log("[CityFilter] Script initialized.");
+    if (!isCheckoutPage()) return;
 
-    // 1. Use capture phase (true) to catch the event before React can swallow it
-    document.body.addEventListener(
-      "change",
-      function (event) {
-        if (!isCheckoutPage()) return;
-
-        const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
-        const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
-
-        // Check if the element that triggered the change is our state select
-        if (stateSelect && event.target === stateSelect && citySelect) {
-          console.log("[CityFilter] State change detected via delegation!");
-          filterCityOptions(stateSelect, citySelect);
-        }
-      },
-      true // <--- TRUE forces it into the capture phase
-    );
-
-    // 2. Observer for initial load and React re-renders
-    const observer = new MutationObserver(function () {
-      if (!isCheckoutPage()) return;
-
+    // ✅ 1. EVENT DELEGATION (ключове виправлення)
+    document.body.addEventListener("change", function (event) {
       const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
       const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
 
-      if (stateSelect && citySelect && citySelect.dataset.cityFilterInitialized !== "1") {
-        citySelect.dataset.cityFilterInitialized = "1";
-        console.log("[CityFilter] Initial load filter applied via observer.");
+      if (!stateSelect || !citySelect) return;
+
+      if (event.target === stateSelect) {
+        console.log("State change detected via delegation");
         filterCityOptions(stateSelect, citySelect);
+      }
+    });
+
+    // ✅ 2. OBSERVER тільки для initial load
+    const observer = new MutationObserver(function () {
+      const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
+      const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
+
+      if (!stateSelect || !citySelect) return;
+
+      if (citySelect.dataset.cityFilterInitialized !== "1") {
+        citySelect.dataset.cityFilterInitialized = "1";
+
+        filterCityOptions(stateSelect, citySelect);
+
+        console.log("Initial load filter applied");
       }
     });
 
     observer.observe(document.body, {
       childList: true,
-      subtree: true,
+      subtree: true
     });
   }
 
@@ -162,4 +141,5 @@
   } else {
     start();
   }
+
 })();
