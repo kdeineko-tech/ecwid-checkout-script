@@ -2,8 +2,10 @@
   const STATE_FIELD_LABEL = "Choose State";
   const CITY_FIELD_LABEL = "Choose City";
 
-  const STATE_DESCRIPTION =
-    "Support your local boot camp! Select your home location from the dropdown and they will earn a percentage from your sale.";
+  const STATE_FIELD_DESCRIPTION =
+    "Support your local boot camp! Select your home location from the dropdown, and they will earn a percentage from your sale.";
+
+ 
 
   const CITY_MAP = {
     "California": ["Los Angeles", "San Diego", "San Jose", "Sacramento"],
@@ -12,57 +14,66 @@
     "New York": ["New York", "Buffalo", "Albany", "Rochester"]
   };
 
-  let lastStateValue = null;
-  let debounceTimer = null;
-
   function normalize(value) {
     return (value || "").replace(/\s+/g, " ").trim().toLowerCase();
   }
 
   function isCheckoutPage() {
-    return !!document.querySelector(".ec-cart, .ec-checkout");
+    return (
+      !!document.querySelector(".ec-cart") ||
+      !!document.querySelector(".ec-checkout")
+    );
   }
 
   function findSelectByLabelText(labelText) {
     const wanted = normalize(labelText);
-    const labels = Array.from(document.querySelectorAll("label, div, span"));
+    const nodes = Array.from(document.querySelectorAll("label, div, span"));
 
-    for (const node of labels) {
-      const text = normalize(node.textContent);
+    for (const node of nodes) {
+      if (normalize(node.textContent) !== wanted) continue;
 
-      if (text !== wanted) continue;
+      let current = node;
 
-      let wrapper = node;
+      for (let i = 0; i < 5 && current; i += 1) {
+        const selects = current.querySelectorAll("select");
 
-      for (let i = 0; i < 8 && wrapper; i++) {
-        const select = wrapper.querySelector("select");
-        if (select) return select;
+        if (selects.length === 1) return selects[0];
 
-        const nextSelect = wrapper.nextElementSibling?.querySelector?.("select");
-        if (nextSelect) return nextSelect;
+        if (selects.length > 1) {
+          for (const select of selects) {
+            const relation = node.compareDocumentPosition(select);
 
-        wrapper = wrapper.parentElement;
+            if (relation & Node.DOCUMENT_POSITION_FOLLOWING) {
+              return select;
+            }
+          }
+
+          return selects[0];
+        }
+
+        current = current.parentElement;
       }
     }
 
     return null;
   }
 
-  function addStateDescription(stateSelect) {
-    if (!stateSelect) return;
+  function findFieldLabelNode(labelText, select) {
+    const wanted = normalize(labelText);
 
-    const existing = document.querySelector("#state-field-description");
-    if (existing) return;
+    let current = select;
 
-    const description = document.createElement("div");
-    description.id = "state-field-description";
-    description.textContent = STATE_DESCRIPTION;
-    description.style.fontSize = "14px";
-    description.style.lineHeight = "1.4";
-    description.style.marginTop = "6px";
-    description.style.color = "#555";
+    for (let i = 0; i < 6 && current; i += 1) {
+      const labelNode = Array.from(
+        current.querySelectorAll("label, div, span")
+      ).find(node => normalize(node.textContent) === wanted);
 
-    stateSelect.insertAdjacentElement("afterend", description);
+      if (labelNode) return labelNode;
+
+      current = current.parentElement;
+    }
+
+    return null;
   }
 
   function isPlaceholder(option) {
@@ -76,20 +87,38 @@
     );
   }
 
-  function filterCityOptions() {
-    if (!isCheckoutPage()) return;
+  function addFieldDescription(labelText, descriptionText) {
+    const select = findSelectByLabelText(labelText);
+    if (!select) return;
 
-    const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
-    const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
+    const labelNode = findFieldLabelNode(labelText, select);
+    if (!labelNode) return;
 
-    if (stateSelect) {
-      addStateDescription(stateSelect);
-    }
+    const fieldContainer =
+      select.closest(".ec-form__cell") ||
+      select.closest(".form-control") ||
+      select.parentElement;
 
-    if (!stateSelect || !citySelect) {
-      console.log("City filter: state or city select not found");
-      return;
-    }
+    if (!fieldContainer) return;
+
+    if (fieldContainer.querySelector(".custom-field-description")) return;
+
+    const description = document.createElement("div");
+    description.className = "custom-field-description";
+    description.textContent = descriptionText;
+
+    description.style.fontSize = "14px";
+    description.style.color = "#000";
+    description.style.marginTop = "6px";
+    description.style.marginBottom = "10px";
+    description.style.lineHeight = "1.4";
+    description.style.fontWeight = "400";
+
+    labelNode.insertAdjacentElement("afterend", description);
+  }
+
+  function filterCityOptions(stateSelect, citySelect) {
+    if (!stateSelect || !citySelect) return;
 
     const selectedStateValue = stateSelect.value;
     const selectedStateText =
@@ -101,76 +130,65 @@
           key => normalize(key) === normalize(selectedStateText)
         );
 
-    const allowedCities = resolvedKey && CITY_MAP[resolvedKey]
-      ? CITY_MAP[resolvedKey].map(normalize)
-      : null;
+    const allowedCities =
+      resolvedKey && CITY_MAP[resolvedKey]
+        ? CITY_MAP[resolvedKey].map(normalize)
+        : null;
 
-    console.log("City filter running. State:", {
-      value: selectedStateValue,
-      text: selectedStateText,
-      resolvedKey
-    });
+    let firstVisible = null;
 
     Array.from(citySelect.options).forEach(option => {
       if (isPlaceholder(option)) {
-        option.hidden = false;
-        option.disabled = false;
         option.style.display = "";
         return;
       }
 
       const cityText = normalize(option.textContent);
-      const isAllowed = !allowedCities || allowedCities.includes(cityText);
 
-      option.hidden = !isAllowed;
-      option.disabled = !isAllowed;
-      option.style.display = isAllowed ? "" : "none";
+      if (!allowedCities || allowedCities.includes(cityText)) {
+        option.style.display = "";
+
+        if (!firstVisible) {
+          firstVisible = option;
+        }
+      } else {
+        option.style.display = "none";
+      }
     });
 
     const currentOption = citySelect.options[citySelect.selectedIndex];
 
-    if (currentOption && currentOption.disabled) {
-      citySelect.value = "";
-      citySelect.dispatchEvent(new Event("input", { bubbles: true }));
+    if (currentOption && currentOption.style.display === "none") {
+      citySelect.value = firstVisible ? firstVisible.value : "";
       citySelect.dispatchEvent(new Event("change", { bubbles: true }));
     }
-
-    lastStateValue = stateSelect.value;
   }
 
-  function scheduleFilter() {
-    clearTimeout(debounceTimer);
+  function applyFieldEnhancements() {
+    if (!isCheckoutPage()) return;
 
-    debounceTimer = setTimeout(function () {
-      filterCityOptions();
-    }, 100);
-  }
-
-  function checkForStateChange() {
     const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
+    const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
 
-    if (!stateSelect) return;
+    if (!stateSelect || !citySelect) return;
 
-    if (stateSelect.value !== lastStateValue) {
-      scheduleFilter();
-    }
+    addFieldDescription(STATE_FIELD_LABEL, STATE_FIELD_DESCRIPTION);
+
+    filterCityOptions(stateSelect, citySelect);
   }
 
   function start() {
-    document.addEventListener("change", scheduleFilter, true);
-    document.addEventListener("input", scheduleFilter, true);
+    document.body.addEventListener("change", function (event) {
+      const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
+      const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
 
-    document.addEventListener(
-      "click",
-      function () {
-        setTimeout(checkForStateChange, 100);
-        setTimeout(checkForStateChange, 300);
-      },
-      true
-    );
+      if (event.target === stateSelect && citySelect) {
+        filterCityOptions(stateSelect, citySelect);
+      }
+    });
 
     const observer = new MutationObserver(function () {
-      scheduleFilter();
+      applyFieldEnhancements();
     });
 
     observer.observe(document.body, {
@@ -178,10 +196,7 @@
       subtree: true
     });
 
-    setTimeout(filterCityOptions, 300);
-    setTimeout(filterCityOptions, 800);
-    setTimeout(filterCityOptions, 1500);
-    setTimeout(filterCityOptions, 2500);
+    applyFieldEnhancements();
   }
 
   if (document.readyState === "loading") {
