@@ -2,6 +2,9 @@
   const STATE_FIELD_LABEL = "Choose State";
   const CITY_FIELD_LABEL = "Choose City";
 
+  const STATE_DESCRIPTION =
+    "Support your local boot camp! Select your home location from the dropdown and they will earn a percentage from your sale.";
+
   const CITY_MAP = {
     "California": ["Los Angeles", "San Diego", "San Jose", "Sacramento"],
     "Texas": ["Houston", "Dallas", "Austin", "San Antonio"],
@@ -45,6 +48,23 @@
     return null;
   }
 
+  function addStateDescription(stateSelect) {
+    if (!stateSelect) return;
+
+    const existing = document.querySelector("#state-field-description");
+    if (existing) return;
+
+    const description = document.createElement("div");
+    description.id = "state-field-description";
+    description.textContent = STATE_DESCRIPTION;
+    description.style.fontSize = "14px";
+    description.style.lineHeight = "1.4";
+    description.style.marginTop = "6px";
+    description.style.color = "#555";
+
+    stateSelect.insertAdjacentElement("afterend", description);
+  }
+
   function isPlaceholder(option) {
     const text = normalize(option.textContent);
 
@@ -61,6 +81,10 @@
 
     const stateSelect = findSelectByLabelText(STATE_FIELD_LABEL);
     const citySelect = findSelectByLabelText(CITY_FIELD_LABEL);
+
+    if (stateSelect) {
+      addStateDescription(stateSelect);
+    }
 
     if (!stateSelect || !citySelect) {
       console.log("City filter: state or city select not found");
@@ -135,10 +159,15 @@
   function start() {
     document.addEventListener("change", scheduleFilter, true);
     document.addEventListener("input", scheduleFilter, true);
-    document.addEventListener("click", function () {
-      setTimeout(checkForStateChange, 100);
-      setTimeout(checkForStateChange, 300);
-    }, true);
+
+    document.addEventListener(
+      "click",
+      function () {
+        setTimeout(checkForStateChange, 100);
+        setTimeout(checkForStateChange, 300);
+      },
+      true
+    );
 
     const observer = new MutationObserver(function () {
       scheduleFilter();
