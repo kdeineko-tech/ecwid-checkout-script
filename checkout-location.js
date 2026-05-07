@@ -1,6 +1,6 @@
 (function () {
   const STATE_FIELD_LABEL = "Support your local Fit Body";
-  const CITY_FIELD_LABEL = "Choose City";
+  const CITY_FIELD_LABEL = "Location City";
 
   const STATE_FIELD_DESCRIPTION =
     "Select your home location from the dropdown, and they will earn a percentage from your sale.";
