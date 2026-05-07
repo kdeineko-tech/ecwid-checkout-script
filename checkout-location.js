@@ -1,13 +1,14 @@
-(function () {
-  const STATE_FIELD_LABEL = "Location State"; // Updated label
-  const CITY_FIELD_LABEL = "Location City";
-  const SUPPORT_FIT_BODY_LABEL = "Support your local Fit Body"; // Added label for the section
+З двома дескрипшинами
 
-  const STATE_FIELD_DESCRIPTION = ""; // Removed description
-  const CITY_FIELD_DESCRIPTION =
-    "If the city list is not filtered to your selected state, please refresh this page to clear your browser cache and try again.";
-  const SUPPORT_FIT_BODY_DESCRIPTION =
-    "Select your home location from the dropdown, and they will earn a percentage from your sale."; // Added description
+(function () {
+  const STATE_FIELD_LABEL = "Support your local Fit Body";
+  const CITY_FIELD_LABEL = "Location City";
+
+  const STATE_FIELD_DESCRIPTION =
+    "Select your home location from the dropdown, and they will earn a percentage from your sale.";
+  const CITY_FIELD_DESCRIPTION = "If the city list is not filtered to your selected state, please refresh this page to clear your browser cache and try again.";
+
+ 
 
   const CITY_MAP = {
     "California": ["Los Angeles", "San Diego", "San Jose", "Sacramento"],
@@ -119,33 +120,6 @@
     labelNode.insertAdjacentElement("afterend", description);
   }
 
-  function addSectionDescription(sectionLabel, sectionDescription) {
-    // Adding a new section for "Support your local Fit Body"
-    const sectionContainer = document.createElement("div");
-    const sectionTitle = document.createElement("div");
-    const sectionText = document.createElement("div");
-
-    sectionTitle.textContent = sectionLabel;
-    sectionText.textContent = sectionDescription;
-
-    sectionTitle.style.fontSize = "16px";
-    sectionTitle.style.fontWeight = "700";
-    sectionText.style.fontSize = "14px";
-    sectionText.style.color = "#000";
-    sectionText.style.marginTop = "6px";
-    sectionText.style.marginBottom = "10px";
-    sectionText.style.lineHeight = "1.4";
-
-    sectionContainer.appendChild(sectionTitle);
-    sectionContainer.appendChild(sectionText);
-
-    // Insert the section right after the email field
-    const emailField = document.querySelector('input[type="email"]'); // Email field
-    if (emailField) {
-      emailField.parentElement.insertBefore(sectionContainer, emailField.nextSibling);
-    }
-  }
-
   function filterCityOptions(stateSelect, citySelect) {
     if (!stateSelect || !citySelect) return;
 
@@ -201,14 +175,9 @@
 
     if (!stateSelect || !citySelect) return;
 
-    // Removed adding description for Location State (state description removed)
-    if (STATE_FIELD_DESCRIPTION) {
-      addFieldDescription(STATE_FIELD_LABEL, STATE_FIELD_DESCRIPTION);
-    }
-
+    addFieldDescription(STATE_FIELD_LABEL, STATE_FIELD_DESCRIPTION);
     addFieldDescription(CITY_FIELD_LABEL, CITY_FIELD_DESCRIPTION);
-
-    addSectionDescription(SUPPORT_FIT_BODY_LABEL, SUPPORT_FIT_BODY_DESCRIPTION); // Add the new section
+    
 
     filterCityOptions(stateSelect, citySelect);
   }
