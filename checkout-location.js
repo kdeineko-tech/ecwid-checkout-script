@@ -1,12 +1,10 @@
 (function () {
-  const STATE_FIELD_LABEL = "Support your local Fit Body";
+  const STATE_FIELD_LABEL = "Location State"; // Updated label
   const CITY_FIELD_LABEL = "Location City";
 
-  const STATE_FIELD_DESCRIPTION =
-    "Select your home location from the dropdown, and they will earn a percentage from your sale.";
-  const CITY_FIELD_DESCRIPTION = "If the city list is not filtered to your selected state, please refresh this page to clear your browser cache and try again.";
-
- 
+  const STATE_FIELD_DESCRIPTION = ""; // Removed description
+  const CITY_FIELD_DESCRIPTION =
+    "If the city list is not filtered to your selected state, please refresh this page to clear your browser cache and try again.";
 
   const CITY_MAP = {
     "California": ["Los Angeles", "San Diego", "San Jose", "Sacramento"],
@@ -173,9 +171,12 @@
 
     if (!stateSelect || !citySelect) return;
 
-    addFieldDescription(STATE_FIELD_LABEL, STATE_FIELD_DESCRIPTION);
+    // Removed adding description for Location State (state description removed)
+    if (STATE_FIELD_DESCRIPTION) {
+      addFieldDescription(STATE_FIELD_LABEL, STATE_FIELD_DESCRIPTION);
+    }
+
     addFieldDescription(CITY_FIELD_LABEL, CITY_FIELD_DESCRIPTION);
-    
 
     filterCityOptions(stateSelect, citySelect);
   }
