@@ -4,8 +4,10 @@
 
   const STATE_FIELD_DESCRIPTION =
     "Select your home location from the dropdown, and they will earn a percentage from your sale.";
-
- 
+  const CITY_FIELD_DESCRIPTION = "test"; // Conditional text under the city field
+  
+  const STATE_PLACEHOLDER = "Choose gym state";  // Placeholder for the state
+  const CITY_PLACEHOLDER = "Choose gym city";    // Placeholder for the city
 
   const CITY_MAP = {
     "California": ["Los Angeles", "San Diego", "San Jose", "Sacramento"],
@@ -56,35 +58,6 @@
     }
 
     return null;
-  }
-
-  function findFieldLabelNode(labelText, select) {
-    const wanted = normalize(labelText);
-
-    let current = select;
-
-    for (let i = 0; i < 6 && current; i += 1) {
-      const labelNode = Array.from(
-        current.querySelectorAll("label, div, span")
-      ).find(node => normalize(node.textContent) === wanted);
-
-      if (labelNode) return labelNode;
-
-      current = current.parentElement;
-    }
-
-    return null;
-  }
-
-  function isPlaceholder(option) {
-    const text = normalize(option.textContent);
-
-    return (
-      !option.value ||
-      text.includes("please choose") ||
-      text.includes("select") ||
-      text.includes("choose")
-    );
   }
 
   function addFieldDescription(labelText, descriptionText) {
@@ -173,8 +146,13 @@
     if (!stateSelect || !citySelect) return;
 
     addFieldDescription(STATE_FIELD_LABEL, STATE_FIELD_DESCRIPTION);
+    addFieldDescription(CITY_FIELD_LABEL, CITY_FIELD_DESCRIPTION);
 
     filterCityOptions(stateSelect, citySelect);
+    
+    // Add placeholders to the selects
+    if (stateSelect) stateSelect.setAttribute("placeholder", STATE_PLACEHOLDER);
+    if (citySelect) citySelect.setAttribute("placeholder", CITY_PLACEHOLDER);
   }
 
   function start() {
