@@ -1,5 +1,3 @@
-З двома дескрипшинами
-
 (function () {
   const STATE_FIELD_LABEL = "Support your local Fit Body";
   const CITY_FIELD_LABEL = "Location City";
