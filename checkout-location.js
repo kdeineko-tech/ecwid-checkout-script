@@ -3,7 +3,7 @@
   const CITY_FIELD_LABEL = "Choose City";
 
   const STATE_FIELD_DESCRIPTION =
-    "Support your local boot camp! Select your home location from the dropdown, and they will earn a percentage from your sale.";
+    "Select your home location from the dropdown, and they will earn a percentage from your sale.";
 
  
 
