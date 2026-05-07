@@ -4,6 +4,7 @@
 
   const STATE_FIELD_DESCRIPTION =
     "Select your home location from the dropdown, and they will earn a percentage from your sale.";
+  const CITY_FIELD_DESCRIPTION = "If the city list is not filtered to your selected state, please refresh this page to clear your browser cache and try again.";
 
  
 
@@ -173,6 +174,8 @@
     if (!stateSelect || !citySelect) return;
 
     addFieldDescription(STATE_FIELD_LABEL, STATE_FIELD_DESCRIPTION);
+    addFieldDescription(CITY_FIELD_LABEL, CITY_FIELD_DESCRIPTION);
+    
 
     filterCityOptions(stateSelect, citySelect);
   }
